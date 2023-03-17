@@ -21,5 +21,9 @@ include(AddLLVM)
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 
+find_package(PkgConfig REQUIRED)
+
+pkg_check_modules(SQLITE3 REQUIRED sqlite3)
+
 add_subdirectory(src)
 add_subdirectory(test)

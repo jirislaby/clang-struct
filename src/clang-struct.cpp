@@ -1,18 +1,23 @@
+#include <sqlite3.h>
+
+#include <clang/StaticAnalyzer/Core/PathSensitive/AnalysisManager.h>
 #include <map>
 #include <memory>
 #include <sstream>
 #include <utility>
 
-#include "clang/StaticAnalyzer/Core/BugReporter/BugReporter.h"
+#include "clang/ASTMatchers/ASTMatchFinder.h"
 #include "clang/StaticAnalyzer/Core/Checker.h"
-#include "clang/StaticAnalyzer/Core/PathSensitive/CheckerContext.h"
 #include "clang/StaticAnalyzer/Frontend/CheckerRegistry.h"
 
+#include "sqlite.h"
+
 using namespace clang;
+using namespace clang::ast_matchers;
 using namespace clang::ento;
 
 namespace {
-class MyChecker final : public Checker</*check::Bind,*/ check::Location,
+class MyChecker final : public Checker</*check::Bind,*/ /*check::Location,*/
 		check::EndOfTranslationUnit> {
 	using RWSet = std::map<std::string, llvm::SmallVector<SourceRange, 10>>;
 
@@ -31,30 +36,46 @@ class MyChecker final : public Checker</*check::Bind,*/ check::Location,
 				 categories::LogicError };
 
 private:
-    template <typename T>
-    bool forEachChildren(const Stmt *stmt,
-			 const std::function<bool(const T *)> &CB) const;
+	SQLHolder openDB() const;
 
-    void reportBug(SourceManager &SM, BugReporter &BR, const BugType &BT,
-		   const std::string &strName, const std::string &name,
-		   const std::string &dir, const SourceRange &range,
-		   const RWSet::mapped_type &ranges = {}) const;
+	template <typename T>
+	bool forEachChildren(const Stmt *stmt,
+			     const std::function<bool(const T *)> &CB) const;
 
-    void expand(const RecordDecl *ST) const;
-    void handleEntry(const SourceRange &SR, const RecordDecl *ST,
-		     const ValueDecl *M, bool isLoad) const;
-    void handleME(const Stmt *S, const MemberExpr *ME, bool isLoad,
-		  CheckerContext &C) const;
+	void reportBug(SourceManager &SM, BugReporter &BR, const BugType &BT,
+		       const std::string &strName, const std::string &name,
+		       const std::string &dir, const SourceRange &range,
+		       const RWSet::mapped_type &ranges = {}) const;
+
+	void expand(const RecordDecl *ST) const;
+	void handleEntry(const SourceRange &SR, const RecordDecl *ST,
+			 const ValueDecl *M, bool isLoad) const;
+	void handleME(const Stmt *S, const MemberExpr *ME, bool isLoad,
+		      CheckerContext &C) const;
 
 public:
   /*void checkBind(const SVal &loc, const SVal &val, const Stmt *S,
 		 CheckerContext &C) const;*/
   //void checkPreStmt(const UnaryOperator *UO, CheckerContext &C) const;
+#if 0
   void checkLocation(const SVal &loc, bool isLoad, const Stmt *S,
 		     CheckerContext &C) const;
+#endif
   void checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
 				 AnalysisManager &A, BugReporter &BR) const;
 };
+
+class MatchCallback : public MatchFinder::MatchCallback {
+public:
+	MatchCallback(SQLStmtHolder &ins, AnalysisDeclContext *ADC) :
+		ins(ins), ADC(ADC) { }
+
+	void run(const MatchFinder::MatchResult &res);
+private:
+	SQLStmtHolder &ins;
+	AnalysisDeclContext *ADC;
+};
+
 }
 
 #if 0
@@ -185,6 +206,7 @@ void MyChecker::checkPreStmt(const UnaryOperator *UO,
 	llvm::errs() << "\n";
 }
 #endif
+#if 0
 template <typename T>
 bool MyChecker::forEachChildren(const Stmt *stmt,
 				const std::function<bool(const T *)> &CB) const
@@ -262,14 +284,15 @@ void MyChecker::checkLocation(const SVal &loc, bool isLoad, const Stmt *S,
 		assert(!strName.empty());
 	}
 
-	/*llvm::errs() << __func__ << " ";
-	S->getSourceRange().dump(C.getSourceManager());*/
-	//S->dumpColor();
-
+	llvm::errs() << __func__ << " ";
+	S->getSourceRange().dump(C.getSourceManager());
+	S->dumpColor();
+#if 0
 	forEachChildren<MemberExpr>(S, [this, &S, &isLoad, &C](const MemberExpr *ME) {
 		handleME(S, ME, isLoad, C);
 		return false;
 	});
+#endif
 }
 
 void MyChecker::reportBug(SourceManager &SM, BugReporter &BR, const BugType &BT,
@@ -324,6 +347,108 @@ void MyChecker::checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
 		reportBug(SM, BR, BTrd, strName, name, "unused", loc);
 	}
 }
+#else
+void MatchCallback::run(const MatchFinder::MatchResult &res)
+{
+	if (auto ME = res.Nodes.getNodeAs<MemberExpr>("ME"))
+	    ME->dumpColor();
+	if (auto RD = res.Nodes.getNodeAs<RecordDecl>("RD"))
+	    RD->dumpColor();
+}
+
+SQLHolder MyChecker::openDB() const
+{
+	sqlite3 *sql;
+	char *err;
+	int ret;
+
+	ret = sqlite3_open_v2("structs.db", &sql, SQLITE_OPEN_READWRITE |
+			      SQLITE_OPEN_CREATE, NULL);
+	SQLHolder sqlHolder(sql);
+	if (ret != SQLITE_OK) {
+		llvm::errs() << "db open failed: " << sqlite3_errstr(ret) << "\n";
+		return nullptr;
+	}
+
+	ret = sqlite3_exec(sqlHolder, "PRAGMA foreign_keys = ON;", NULL, NULL,
+			   &err);
+	if (ret != SQLITE_OK) {
+		llvm::errs() << "db create failed: " << sqlite3_errstr(ret) <<
+				" -> " << err << "\n";
+		return nullptr;
+	}
+
+	static const llvm::SmallVector<const char *> creates {
+		"source(id INTEGER PRIMARY KEY, "
+			"src TEXT NOT NULL UNIQUE)",
+		"struct(id INTEGER PRIMARY KEY, "
+			"name TEXT NOT NULL, "
+			"src INTEGER NOT NULL REFERENCES source(id), "
+			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL, "
+			"endLine INTEGER, endCol INTEGER,"
+			"UNIQUE(name, src))",
+		"member(id INTEGER PRIMARY KEY, "
+			"name TEXT NOT NULL UNIQUE, "
+			"struct INTEGER NOT NULL REFERENCES struct(id))"
+	};
+
+	/*
+$db->do('CREATE TABLE IF NOT EXISTS fixes(id INTEGER PRIMARY KEY, ' .
+	'sha INTEGER NOT NULL REFERENCES shas(id), ' .
+	'done INTEGER DEFAULT 0 NOT NULL, ' .
+	'subsys INTEGER NOT NULL REFERENCES subsys(id), ' .
+	'prod INTEGER NOT NULL REFERENCES prod(id), ' .
+	'via INTEGER REFERENCES via(id), ' .
+	'created TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, ' .
+	'updated TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, ' .
+	'UNIQUE(sha, prod)) STRICT;') or
+	die "cannot create table fixes";
+	 */
+	for (auto c: creates) {
+		std::string s("CREATE TABLE IF NOT EXISTS ");
+		s.append(c).append(" STRICT;");
+		ret = sqlite3_exec(sqlHolder, s.c_str(), NULL, NULL, &err);
+		if (ret != SQLITE_OK) {
+			llvm::errs() << "db create failed: " << sqlite3_errstr(ret) <<
+					" -> " << err << "\n\t" << s << "\n";
+			return nullptr;
+		}
+	}
+
+	return sqlHolder;
+}
+
+void MyChecker::checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
+					  AnalysisManager &A,
+					  BugReporter &BR) const
+{
+	sqlite3_stmt *stmt;
+	int ret;
+
+	auto sqlHolder = openDB();
+
+	ret = sqlite3_prepare_v2(sqlHolder,
+				 "INSERT OR IGNORE INTO member(struct, name) "
+				 "SELECT id, ? FROM struct WHERE name=?;",
+				 -1, &stmt, NULL);
+	SQLStmtHolder ins(stmt);
+	if (ret != SQLITE_OK) {
+		llvm::errs() << "db prepare failed: " << sqlite3_errstr(ret) <<
+			" -> " << sqlite3_errmsg(sqlHolder) << "\n";
+		return;
+	}
+
+	TU->dumpColor();
+
+	MatchFinder F;
+	MatchCallback CB(ins, A.getAnalysisDeclContext(TU));
+	F.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, memberExpr().bind("ME")),
+		     &CB);
+	F.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, recordDecl(isStruct()).bind("RD")),
+		     &CB);
+	F.matchAST(A.getASTContext());
+}
+#endif
 
 extern "C" void clang_registerCheckers(CheckerRegistry &registry) {
   registry.addChecker<MyChecker>("jirislaby.StructMembersChecker",
