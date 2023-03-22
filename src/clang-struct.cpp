@@ -660,6 +660,7 @@ SQLHolder MyChecker::openDB() const
 	if (ret != SQLITE_OK) {
 		llvm::errs() << "db PRAGMA failed (" << __LINE__ << "): " <<
 				sqlite3_errstr(ret) << " -> " << err << "\n";
+		sqlite3_free(err);
 		return nullptr;
 	}
 
@@ -695,6 +696,7 @@ SQLHolder MyChecker::openDB() const
 			llvm::errs() << "db CREATE failed (" << __LINE__ << "): " <<
 					sqlite3_errstr(ret) << " -> " <<
 					err << "\n\t" << s << "\n";
+			sqlite3_free(err);
 			return nullptr;
 		}
 	}
@@ -734,6 +736,7 @@ SQLHolder MyChecker::openDB() const
 			llvm::errs() << "db CREATE failed (" << __LINE__ << "): " <<
 					sqlite3_errstr(ret) << " -> " <<
 					err << "\n\t" << s << "\n";
+			sqlite3_free(err);
 			return nullptr;
 		}
 	}
@@ -825,6 +828,7 @@ void MyChecker::checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
 	if (ret != SQLITE_OK) {
 		llvm::errs() << "db BEGIN failed (" << __LINE__ << "): " <<
 				sqlite3_errstr(ret) << " -> " << err << "\n";
+		sqlite3_free(err);
 		return;
 	}
 
@@ -834,6 +838,7 @@ void MyChecker::checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
 	if (ret != SQLITE_OK) {
 		llvm::errs() << "db END failed (" << __LINE__ << "): " <<
 				sqlite3_errstr(ret) << " -> " << err << "\n";
+		sqlite3_free(err);
 		return;
 	}
 }
