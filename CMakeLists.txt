@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.3.0)
 # C needed for LLVM -> terminfo
 project(clang-struct VERSION 1.0.0 LANGUAGES C CXX)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 add_compile_options(-Wall)
 
 if (USE_WEXTRA)
