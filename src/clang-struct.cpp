@@ -518,8 +518,8 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 {
 	//RD->dumpColor();
 
-	auto SR = RD->getSourceRange();
-	auto src = getSrc(SR.getBegin());
+	auto RDSR = RD->getSourceRange();
+	auto src = getSrc(RDSR.getBegin());
 	int ret;
 
 	ret = sqlite3_bind_text(insSrc,
@@ -567,7 +567,7 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 				sqlite3_errmsg(sqlHolder) << "\n";
 		return;
 	}
-	ret = bindLoc(insStr, SR);
+	ret = bindLoc(insStr, RDSR);
 	if (ret != SQLITE_OK) {
 		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
 				sqlite3_errstr(ret) << " -> " <<
@@ -608,6 +608,34 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 					sqlite3_bind_parameter_index(insMem, ":struct"),
 					RD->getNameAsString().c_str(), -1,
 					SQLITE_TRANSIENT);
+		if (ret != SQLITE_OK) {
+			llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
+					sqlite3_errstr(ret) << " -> " <<
+					sqlite3_errmsg(sqlHolder) << "\n";
+			return;
+		}
+		ret = sqlite3_bind_text(insMem,
+					sqlite3_bind_parameter_index(insMem, ":src"),
+					src.c_str(), -1,
+					SQLITE_TRANSIENT);
+		if (ret != SQLITE_OK) {
+			llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
+					sqlite3_errstr(ret) << " -> " <<
+					sqlite3_errmsg(sqlHolder) << "\n";
+			return;
+		}
+		ret = sqlite3_bind_int(insMem,
+				       sqlite3_bind_parameter_index(insMem, ":strBegLine"),
+				       SM.getPresumedLineNumber(RDSR.getBegin()));
+		if (ret != SQLITE_OK) {
+			llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
+					sqlite3_errstr(ret) << " -> " <<
+					sqlite3_errmsg(sqlHolder) << "\n";
+			return;
+		}
+		ret = sqlite3_bind_int(insMem,
+				       sqlite3_bind_parameter_index(insMem, ":strBegCol"),
+				       SM.getPresumedColumnNumber(RDSR.getBegin()));
 		if (ret != SQLITE_OK) {
 			llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
 					sqlite3_errstr(ret) << " -> " <<
@@ -680,7 +708,7 @@ SQLHolder MyChecker::openDB() const
 			"src INTEGER NOT NULL REFERENCES source(id), "
 			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL, "
 			"endLine INTEGER, endCol INTEGER, "
-			"UNIQUE(src, name))",
+			"UNIQUE(name, src, begLine, begCol))",
 		"member(id INTEGER PRIMARY KEY, "
 			"name TEXT NOT NULL, "
 			"struct INTEGER NOT NULL REFERENCES struct(id), "
@@ -791,8 +819,11 @@ void MyChecker::checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
 	ret = sqlite3_prepare_v2(sqlHolder,
 				 "INSERT OR IGNORE INTO "
 				 "member(name, struct, begLine, begCol, endLine, endCol) "
-				 "SELECT :name, id, :begLine, :begCol, :endLine, :endCol "
-					"FROM struct WHERE name=:struct;",
+				 "SELECT :name, struct.id, :begLine, :begCol, :endLine, :endCol "
+					"FROM struct LEFT JOIN source ON struct.src=source.id "
+					"WHERE source.src=:src AND "
+					"begLine=:strBegLine AND begCol=:strBegCol AND "
+					"name=:struct;",
 				 -1, &stmt, NULL);
 	SQLStmtHolder insMem(stmt);
 	if (ret != SQLITE_OK) {
