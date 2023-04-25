@@ -1,6 +1,6 @@
 #include <sqlite3.h>
 
-//#include <map>
+#include <filesystem>
 #include <memory>
 //#include <sstream>
 //#include <utility>
@@ -77,6 +77,7 @@ public:
 	void run(const MatchFinder::MatchResult &res);
 private:
 	int bindLoc(SQLStmtHolder &stmt, const SourceRange &SR);
+	std::filesystem::path getSrc(const SourceLocation &SLOC);
 
 	void handleUse(const MemberExpr *ME, const RecordType *ST);
 	void handleME(const MemberExpr *ME);
@@ -388,15 +389,22 @@ int MatchCallback::bindLoc(SQLStmtHolder &stmt, const SourceRange &SR)
 				SM.getPresumedColumnNumber(SR.getEnd()));
 }
 
+std::filesystem::path MatchCallback::getSrc(const SourceLocation &SLOC)
+{
+	auto src = SM.getPresumedLoc(SLOC).getFilename();
+
+	return std::filesystem::canonical(src);
+}
+
 void MatchCallback::handleUse(const MemberExpr *ME, const RecordType *ST)
 {
-	auto strSrc = SM.getPresumedLoc(ST->getDecl()->getBeginLoc()).getFilename();
-	auto useSrc = SM.getPresumedLoc(ME->getBeginLoc()).getFilename();
+	auto strSrc = getSrc(ST->getDecl()->getBeginLoc());
+	auto useSrc = getSrc(ME->getBeginLoc());
 	int ret;
 
 	ret = sqlite3_bind_text(insSrc,
 				sqlite3_bind_parameter_index(insSrc, ":src"),
-				useSrc, -1,
+				useSrc.c_str(), -1,
 				SQLITE_STATIC);
 	if (ret != SQLITE_OK) {
 		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
@@ -443,7 +451,7 @@ void MatchCallback::handleUse(const MemberExpr *ME, const RecordType *ST)
 	}
 	ret = sqlite3_bind_text(insUse,
 				sqlite3_bind_parameter_index(insUse, ":str_src"),
-				strSrc, -1,
+				strSrc.c_str(), -1,
 				SQLITE_STATIC);
 	if (ret != SQLITE_OK) {
 		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
@@ -453,7 +461,7 @@ void MatchCallback::handleUse(const MemberExpr *ME, const RecordType *ST)
 	}
 	ret = sqlite3_bind_text(insUse,
 				sqlite3_bind_parameter_index(insUse, ":use_src"),
-				useSrc, -1,
+				useSrc.c_str(), -1,
 				SQLITE_STATIC);
 	if (ret != SQLITE_OK) {
 		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
@@ -511,12 +519,12 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 	//RD->dumpColor();
 
 	auto SR = RD->getSourceRange();
-	auto src = SM.getPresumedLoc(SR.getBegin()).getFilename();
+	auto src = getSrc(SR.getBegin());
 	int ret;
 
 	ret = sqlite3_bind_text(insSrc,
 				sqlite3_bind_parameter_index(insSrc, ":src"),
-				src, -1,
+				src.c_str(), -1,
 				SQLITE_STATIC);
 	if (ret != SQLITE_OK) {
 		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
@@ -551,7 +559,7 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 	}
 	ret = sqlite3_bind_text(insStr,
 				sqlite3_bind_parameter_index(insStr, ":src"),
-				src, -1,
+				src.c_str(), -1,
 				SQLITE_STATIC);
 	if (ret != SQLITE_OK) {
 		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
