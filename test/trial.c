@@ -1,3 +1,5 @@
+#include "../test/trial.h"
+
 void modify_int(int *);
 
 struct X {
