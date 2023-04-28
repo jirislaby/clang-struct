@@ -83,6 +83,8 @@ private:
 	void handleME(const MemberExpr *ME);
 	void handleRD(const RecordDecl *RD);
 
+	static std::string getRDName(const RecordDecl *RD);
+
 	SourceManager &SM;
 
 	SQLHolder &sqlHolder;
@@ -405,7 +407,7 @@ void MatchCallback::handleUse(const MemberExpr *ME, const RecordType *ST)
 	ret = sqlite3_bind_text(insSrc,
 				sqlite3_bind_parameter_index(insSrc, ":src"),
 				useSrc.c_str(), -1,
-				SQLITE_STATIC);
+				SQLITE_TRANSIENT);
 	if (ret != SQLITE_OK) {
 		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
 				sqlite3_errstr(ret) << " -> " <<
@@ -452,7 +454,7 @@ void MatchCallback::handleUse(const MemberExpr *ME, const RecordType *ST)
 	ret = sqlite3_bind_text(insUse,
 				sqlite3_bind_parameter_index(insUse, ":str_src"),
 				strSrc.c_str(), -1,
-				SQLITE_STATIC);
+				SQLITE_TRANSIENT);
 	if (ret != SQLITE_OK) {
 		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
 				sqlite3_errstr(ret) << " -> " <<
@@ -462,7 +464,7 @@ void MatchCallback::handleUse(const MemberExpr *ME, const RecordType *ST)
 	ret = sqlite3_bind_text(insUse,
 				sqlite3_bind_parameter_index(insUse, ":use_src"),
 				useSrc.c_str(), -1,
-				SQLITE_STATIC);
+				SQLITE_TRANSIENT);
 	if (ret != SQLITE_OK) {
 		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
 				sqlite3_errstr(ret) << " -> " <<
@@ -514,6 +516,12 @@ void MatchCallback::handleME(const MemberExpr *ME)
 	}
 }
 
+std::string MatchCallback::getRDName(const RecordDecl *RD)
+{
+	return RD->isAnonymousStructOrUnion() ? "<anonymous>" :
+						RD->getNameAsString();
+}
+
 void MatchCallback::handleRD(const RecordDecl *RD)
 {
 	//RD->dumpColor();
@@ -525,7 +533,7 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 	ret = sqlite3_bind_text(insSrc,
 				sqlite3_bind_parameter_index(insSrc, ":src"),
 				src.c_str(), -1,
-				SQLITE_STATIC);
+				SQLITE_TRANSIENT);
 	if (ret != SQLITE_OK) {
 		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
 				sqlite3_errstr(ret) << " -> " <<
@@ -549,7 +557,7 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 
 	ret = sqlite3_bind_text(insStr,
 				sqlite3_bind_parameter_index(insStr, ":name"),
-				RD->getNameAsString().c_str(), -1,
+				getRDName(RD).c_str(), -1,
 				SQLITE_TRANSIENT);
 	if (ret != SQLITE_OK) {
 		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
@@ -560,7 +568,7 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 	ret = sqlite3_bind_text(insStr,
 				sqlite3_bind_parameter_index(insStr, ":src"),
 				src.c_str(), -1,
-				SQLITE_STATIC);
+				SQLITE_TRANSIENT);
 	if (ret != SQLITE_OK) {
 		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
 				sqlite3_errstr(ret) << " -> " <<
@@ -606,7 +614,7 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 		}
 		ret = sqlite3_bind_text(insMem,
 					sqlite3_bind_parameter_index(insMem, ":struct"),
-					RD->getNameAsString().c_str(), -1,
+					getRDName(RD).c_str(), -1,
 					SQLITE_TRANSIENT);
 		if (ret != SQLITE_OK) {
 			llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
