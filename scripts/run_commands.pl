@@ -2,8 +2,15 @@
 use strict;
 use warnings;
 use Data::Dumper;
+use Getopt::Long;
 use JSON;
 use Parallel::ForkManager;
+
+my $filter;
+my $verbose = 0;
+GetOptions ("filter=s" => \$filter,
+	    "verbose+"  => \$verbose)
+or die("Error in command line arguments\n");
 
 #sub get_cmdline($) {
 #	my @cmd = split /\s+/, shift;
@@ -52,11 +59,15 @@ $SIG{'TERM'} = \&stop;
 
 foreach my $entry (@{$json}) {
 	last if $stop;
+	my $file = $entry->{'file'};
+	next if (defined $filter && $file !~ $filter);
 	$pm->start and next;
 
-	print $entry->{'file'}, "\n";
-	print "\tCMD=", substr($entry->{'command'}, 0, 50), "\n";
-	print "\tDIR=", $entry->{'directory'}, "\n";
+	print "$file\n";
+	if ($verbose) {
+	    print "\tCMD=", substr($entry->{'command'}, 0, 50), "\n";
+	    print "\tDIR=", $entry->{'directory'}, "\n";
+	}
 
 	chdir $entry->{'directory'} or die "cannot cd to $entry->{'directory'}";
 
