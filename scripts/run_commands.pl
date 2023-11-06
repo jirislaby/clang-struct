@@ -5,21 +5,21 @@ use Data::Dumper;
 use Parallel::ForkManager;
 use JSON;
 
-sub get_cmdline($) {
-	my @cmd = split /\s+/, shift;
-
-	@cmd = map {
-		if (/^-[cfm]/ || /^-Wp/ || /^-Werror/ || /^-nostdinc/ ||
-				/^--target/) {
-			()
-		} else {
-			($_);
-		}
-	} @cmd;
-	print Dumper(\@cmd);
-
-	return @cmd;
-}
+#sub get_cmdline($) {
+#	my @cmd = split /\s+/, shift;
+#
+#	@cmd = map {
+#		if (/^-[cfm]/ || /^-Wp/ || /^-Werror/ || /^-nostdinc/ ||
+#				/^--target/) {
+#			()
+#		} else {
+#			($_);
+#		}
+#	} @cmd;
+#	print Dumper(\@cmd);
+#
+#	return @cmd;
+#}
 
 my $json;
 {
