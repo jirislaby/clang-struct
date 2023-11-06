@@ -1,9 +1,6 @@
 #include <sqlite3.h>
 
 #include <filesystem>
-#include <memory>
-//#include <sstream>
-//#include <utility>
 #include <thread>
 
 #include "clang/ASTMatchers/ASTMatchFinder.h"
