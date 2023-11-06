@@ -48,6 +48,7 @@ sub getNumCpu() {
 }
 
 my $pm = Parallel::ForkManager->new(getNumCpu());
+$pm->set_waitpid_blocking_sleep(0);
 my $stop = 0;
 
 sub stop() {
