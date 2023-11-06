@@ -404,6 +404,7 @@ void MatchCallback::handleUse(const MemberExpr *ME, const RecordType *ST)
 	auto useSrc = getSrc(ME->getBeginLoc());
 	int ret;
 
+	SQLStmtResetter insSrcResetter(sqlHolder, insSrc);
 	ret = sqlite3_bind_text(insSrc,
 				sqlite3_bind_parameter_index(insSrc, ":src"),
 				useSrc.c_str(), -1,
@@ -421,16 +422,10 @@ void MatchCallback::handleUse(const MemberExpr *ME, const RecordType *ST)
 				sqlite3_errmsg(sqlHolder) << "\n";
 		return;
 	}
-	ret = sqlite3_reset(insSrc);
-	if (ret != SQLITE_OK) {
-		llvm::errs() << "db clear failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " <<
-				sqlite3_errmsg(sqlHolder) << "\n";
-		return;
-	}
 
 	/*
 			":begLine, :begCol, :endLine, :endCol;",*/
+	SQLStmtResetter insUseResetter(sqlHolder, insUse);
 	ret = sqlite3_bind_text(insUse,
 				sqlite3_bind_parameter_index(insUse, ":member"),
 				ME->getMemberDecl()->getNameAsString().c_str(), -1,
@@ -485,13 +480,6 @@ void MatchCallback::handleUse(const MemberExpr *ME, const RecordType *ST)
 				sqlite3_errmsg(sqlHolder) << "\n";
 		return;
 	}
-	ret = sqlite3_reset(insUse);
-	if (ret != SQLITE_OK) {
-		llvm::errs() << "db clear failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " <<
-				sqlite3_errmsg(sqlHolder) << "\n";
-		return;
-	}
 }
 
 void MatchCallback::handleME(const MemberExpr *ME)
@@ -530,6 +518,7 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 	auto src = getSrc(RDSR.getBegin());
 	int ret;
 
+	SQLStmtResetter insSrcResetter(sqlHolder, insSrc);
 	ret = sqlite3_bind_text(insSrc,
 				sqlite3_bind_parameter_index(insSrc, ":src"),
 				src.c_str(), -1,
@@ -547,14 +536,8 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 				sqlite3_errmsg(sqlHolder) << "\n";
 		return;
 	}
-	ret = sqlite3_reset(insSrc);
-	if (ret != SQLITE_OK) {
-		llvm::errs() << "db clear failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " <<
-				sqlite3_errmsg(sqlHolder) << "\n";
-		return;
-	}
 
+	SQLStmtResetter insStrResetter(sqlHolder, insStr);
 	ret = sqlite3_bind_text(insStr,
 				sqlite3_bind_parameter_index(insStr, ":name"),
 				getRDName(RD).c_str(), -1,
@@ -589,19 +572,13 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 				sqlite3_errmsg(sqlHolder) << "\n";
 		return;
 	}
-	ret = sqlite3_reset(insStr);
-	if (ret != SQLITE_OK) {
-		llvm::errs() << "db clear failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " <<
-				sqlite3_errmsg(sqlHolder) << "\n";
-		return;
-	}
 
 	for (const auto &f : RD->fields()) {
 		//f->dumpColor();
 		/*llvm::errs() << __func__ << ": " << RD->getNameAsString() <<
 				"." << f->getNameAsString() << "\n";*/
 		auto SR = f->getSourceRange();
+		SQLStmtResetter insMemResetter(sqlHolder, insMem);
 		ret = sqlite3_bind_text(insMem,
 					sqlite3_bind_parameter_index(insMem, ":name"),
 					f->getNameAsString().c_str(), -1,
@@ -663,13 +640,6 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 				    sqlite3_errstr(ret) << " -> " <<
 				    sqlite3_errmsg(sqlHolder) << "\n";
 		    return;
-		}
-		ret = sqlite3_reset(insMem);
-		if (ret != SQLITE_OK) {
-			llvm::errs() << "db reset failed (" << __LINE__ << "): " <<
-					sqlite3_errstr(ret) << " -> " <<
-					sqlite3_errmsg(sqlHolder) << "\n";
-			return;
 		}
 	}
 }

@@ -1,6 +1,8 @@
 #ifndef SQLITE_H
 #define SQLITE_H
 
+#include <llvm/Support/raw_ostream.h>
+
 #include <memory>
 
 #include <sqlite3.h>
@@ -22,6 +24,21 @@ struct SQLStmtHolder : public SQLStmtUnique {
 	}) {}
 
 	operator sqlite3_stmt *() { return get(); }
+};
+
+struct SQLStmtResetter {
+	SQLStmtResetter(sqlite3 *sql, sqlite3_stmt *stmt) : sql(sql), stmt(stmt) { }
+	~SQLStmtResetter() {
+		int ret = sqlite3_reset(stmt);
+		if (ret != SQLITE_OK) {
+		    llvm::errs() << "stmt reset failed (" << __LINE__ << "): " <<
+				sqlite3_errstr(ret) << " -> " <<
+				sqlite3_errmsg(sql) << "\n";
+		}
+	}
+private:
+	sqlite3 *sql;
+	sqlite3_stmt *stmt;
 };
 
 #endif
