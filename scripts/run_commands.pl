@@ -68,7 +68,7 @@ foreach my $entry (@{$json}) {
 	#	system(@cmd) == 0 or die "cannot exec '" . join(' ', @cmd) . "'";
 	my $cmd = $entry->{'command'};
 	$cmd .= ' -w -E -o - | clang -cc1 -analyze -w';
-	$cmd .= ' -load ../../clang-struct/src/clang-struct.so';
+	$cmd .= ' -load clang-struct.so';
 	$cmd .= ' -analyzer-checker jirislaby.StructMembersChecker';
 	#print "$cmd\n";
 	exec($cmd);
