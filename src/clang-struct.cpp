@@ -4,6 +4,7 @@
 #include <memory>
 //#include <sstream>
 //#include <utility>
+#include <thread>
 
 #include "clang/ASTMatchers/ASTMatchFinder.h"
 #include "clang/StaticAnalyzer/Core/Checker.h"
@@ -655,6 +656,16 @@ void MatchCallback::run(const MatchFinder::MatchResult &res)
 	}
 }
 
+static int busy_handler(void *data, int count)
+{
+	if (count >= 1000)
+		return 0;
+
+	std::this_thread::sleep_for(count * std::chrono::milliseconds(50));
+
+	return 1;
+}
+
 SQLHolder MyChecker::openDB() const
 {
 	sqlite3 *sql;
@@ -673,6 +684,14 @@ SQLHolder MyChecker::openDB() const
 			   &err);
 	if (ret != SQLITE_OK) {
 		llvm::errs() << "db PRAGMA failed (" << __LINE__ << "): " <<
+				sqlite3_errstr(ret) << " -> " << err << "\n";
+		sqlite3_free(err);
+		return nullptr;
+	}
+
+	ret = sqlite3_busy_handler(sqlHolder, busy_handler, nullptr);
+	if (ret != SQLITE_OK) {
+		llvm::errs() << "db busy_handler failed (" << __LINE__ << "): " <<
 				sqlite3_errstr(ret) << " -> " << err << "\n";
 		sqlite3_free(err);
 		return nullptr;
