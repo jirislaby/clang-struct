@@ -355,7 +355,7 @@ static int busy_handler(void *data, int count)
 	if (count >= 1000)
 		return 0;
 
-	std::this_thread::sleep_for(count * std::chrono::milliseconds(50));
+	std::this_thread::sleep_for(std::min(count, 10) * std::chrono::milliseconds(50));
 
 	return 1;
 }
