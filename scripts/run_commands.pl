@@ -12,22 +12,6 @@ GetOptions ("filter=s" => \$filter,
 	    "verbose+"  => \$verbose)
 or die("Error in command line arguments\n");
 
-#sub get_cmdline($) {
-#	my @cmd = split /\s+/, shift;
-#
-#	@cmd = map {
-#		if (/^-[cfm]/ || /^-Wp/ || /^-Werror/ || /^-nostdinc/ ||
-#				/^--target/) {
-#			()
-#		} else {
-#			($_);
-#		}
-#	} @cmd;
-#	print Dumper(\@cmd);
-#
-#	return @cmd;
-#}
-
 my $json;
 {
 	local $/;
@@ -71,12 +55,6 @@ foreach my $entry (@{$json}) {
 
 	chdir $entry->{'directory'} or die "cannot cd to $entry->{'directory'}";
 
-	#	my @cmd = get_cmdline($entry->{'command'});
-	#	splice @cmd, 1, 0, qw|-cc1 -analyze
-	#		-load ../../clang-struct/src/clang-struct.so
-	#		-analyzer-checker jirislaby.StructMembersChecker|;
-	#
-	#	system(@cmd) == 0 or die "cannot exec '" . join(' ', @cmd) . "'";
 	my $cmd = $entry->{'command'};
 	$cmd .= ' -w -E -o - | clang -cc1 -analyze -w';
 	$cmd .= ' -load clang-struct.so';
