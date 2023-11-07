@@ -29,9 +29,10 @@ class MatchCallback : public MatchFinder::MatchCallback {
 public:
 	MatchCallback(SourceManager &SM, SQLHolder &sqlHolder,
 		      SQLStmtHolder &insSrc, SQLStmtHolder &insStr,
-		      SQLStmtHolder &insMem, SQLStmtHolder &insUse) :
+		      SQLStmtHolder &insMem, SQLStmtHolder &insUse,
+		      std::filesystem::path &basePath) :
 		SM(SM), sqlHolder(sqlHolder), insSrc(insSrc), insStr(insStr),
-		insMem(insMem), insUse(insUse) { }
+		insMem(insMem), insUse(insUse), basePath(basePath) { }
 
 	void run(const MatchFinder::MatchResult &res);
 private:
@@ -51,6 +52,7 @@ private:
 	SQLStmtHolder &insStr;
 	SQLStmtHolder &insMem;
 	SQLStmtHolder &insUse;
+	std::filesystem::path &basePath;
 };
 
 }
@@ -83,7 +85,12 @@ std::filesystem::path MatchCallback::getSrc(const SourceLocation &SLOC)
 {
 	auto src = SM.getPresumedLoc(SLOC).getFilename();
 
-	return std::filesystem::canonical(src);
+	auto ret = std::filesystem::canonical(src);
+
+	if (!basePath.empty())
+		ret = std::filesystem::relative(ret, basePath);
+
+	return ret;
 }
 
 void MatchCallback::handleUse(const MemberExpr *ME, const RecordType *ST)
@@ -539,9 +546,12 @@ void MyChecker::checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
 
 	//TU->dumpColor();
 
+	auto basePathStr = A.getAnalyzerOptions().getCheckerStringOption(this, "basePath");
+	std::filesystem::path basePath(basePathStr.str());
+
 	MatchFinder F;
 	MatchCallback CB(A.getSourceManager(), sqlHolder, insSrc, insStr,
-			 insMem, insUse);
+			 insMem, insUse, basePath);
 	F.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, memberExpr().bind("ME")),
 		     &CB);
 	F.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, recordDecl(isStruct()).bind("RD")),
@@ -571,8 +581,8 @@ extern "C" void clang_registerCheckers(CheckerRegistry &registry) {
 				 "Searches for unused struct members",
 				 "");
   registry.addCheckerOption("string", "jirislaby.StructMembersChecker",
-			    "strName", "",
-			    "Name of the structure to look into",
+			    "basePath", "",
+			    "Path to resolve file paths against (empty = absolute paths)",
 			    "released");
 }
 
