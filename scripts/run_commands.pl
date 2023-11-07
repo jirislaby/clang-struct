@@ -46,6 +46,7 @@ $SIG{'TERM'} = \&stop;
 foreach my $entry (@{$json}) {
 	last if $stop;
 	my $file = $entry->{'file'};
+	next unless ($file =~ /\.c$/);
 	next if (defined $filter && $file !~ $filter);
 	$pm->start and next;
 
