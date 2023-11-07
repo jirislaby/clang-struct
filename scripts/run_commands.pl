@@ -39,7 +39,6 @@ my $json;
 $json = JSON->new->allow_nonref->decode($json);
 
 sub getNumCpu() {
-	return 1;
 	open my $cpuinfo, '/proc/cpuinfo' or die "cannot open cpuinfo";
 	my $ret = scalar (map /^processor/, <$cpuinfo>);
 	close $cpuinfo;
