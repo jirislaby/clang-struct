@@ -232,10 +232,37 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 		return;
 	}
 
+	bool cont = false;
+	std::stringstream attrs;
+	for (const auto &f : RD->attrs()) {
+		// implicit attrs don't have names
+		if (!f->getAttrName()) {
+			if (!f->isImplicit()) {
+				llvm::errs() << "unnamed attribute in:\n";
+				RD->dumpColor();
+			}
+			continue;
+		}
+		if (cont)
+			attrs << "|";
+		attrs << f->getNormalizedFullName();
+		cont = true;
+	}
+
 	SQLStmtResetter insStrResetter(sqlHolder, insStr);
 	ret = sqlite3_bind_text(insStr,
 				sqlite3_bind_parameter_index(insStr, ":name"),
 				getRDName(RD).c_str(), -1,
+				SQLITE_TRANSIENT);
+	if (ret != SQLITE_OK) {
+		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
+				sqlite3_errstr(ret) << " -> " <<
+				sqlite3_errmsg(sqlHolder) << "\n";
+		return;
+	}
+	ret = sqlite3_bind_text(insStr,
+				sqlite3_bind_parameter_index(insStr, ":attrs"),
+				attrs.str().c_str(), -1,
 				SQLITE_TRANSIENT);
 	if (ret != SQLITE_OK) {
 		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
@@ -396,6 +423,7 @@ SQLHolder MyChecker::openDB() const
 			"src TEXT NOT NULL UNIQUE)",
 		"struct(id INTEGER PRIMARY KEY, "
 			"name TEXT NOT NULL, "
+			"attrs TEXT, "
 			"src INTEGER NOT NULL REFERENCES source(id), "
 			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL, "
 			"endLine INTEGER, endCol INTEGER, "
@@ -430,7 +458,7 @@ SQLHolder MyChecker::openDB() const
 
 	static const llvm::SmallVector<const char *> create_views {
 		"structs_view AS "
-			"SELECT struct.id, struct.name AS struct, source.src, "
+			"SELECT struct.id, struct.name AS struct, struct.attrs, source.src, "
 				"struct.begLine || ':' || struct.begCol || "
 				"'-' || struct.endLine || ':' || struct.endCol "
 				"AS location "
@@ -500,8 +528,8 @@ void MyChecker::checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
 
 	ret = sqlite3_prepare_v2(sqlHolder,
 				 "INSERT OR IGNORE INTO "
-				 "struct(name, src, begLine, begCol, endLine, endCol) "
-				 "SELECT :name, id, :begLine, :begCol, :endLine, :endCol "
+				 "struct(name, attrs, src, begLine, begCol, endLine, endCol) "
+				 "SELECT :name, :attrs, id, :begLine, :begCol, :endLine, :endCol "
 					"FROM source WHERE src=:src;",
 				 -1, &stmt, NULL);
 	SQLStmtHolder insStr(stmt);

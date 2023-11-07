@@ -10,6 +10,10 @@ struct X {
 	int used_ptr;
 };
 
+struct PACKED {
+	int used_by_hw;
+} __attribute__((packed,aligned(128)));
+
 void fun(struct X *x)
 {
 	x->wr = 1;

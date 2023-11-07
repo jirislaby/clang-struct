@@ -1,5 +1,6 @@
 list(APPEND test_files
 	nested_struct.c
+	packed.c
 )
 
 set(LLVM_OPTIONAL_SOURCES ${test_files} trial.c trial.h)
