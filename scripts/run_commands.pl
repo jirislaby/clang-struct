@@ -7,8 +7,10 @@ use JSON;
 use Parallel::ForkManager;
 
 my $filter;
+my $basepath = "";
 my $verbose = 0;
 GetOptions ("filter=s" => \$filter,
+	    "basepath=s" => \$basepath,
 	    "verbose+"  => \$verbose)
 or die("Error in command line arguments\n");
 
@@ -59,6 +61,7 @@ foreach my $entry (@{$json}) {
 	$cmd .= ' -w -E -o - | clang -cc1 -analyze -w';
 	$cmd .= ' -load clang-struct.so';
 	$cmd .= ' -analyzer-checker jirislaby.StructMembersChecker';
+	$cmd .= " -analyzer-config jirislaby.StructMembersChecker:basePath=$basepath";
 	#print "$cmd\n";
 	exec($cmd);
 }
