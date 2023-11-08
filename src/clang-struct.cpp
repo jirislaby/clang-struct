@@ -491,7 +491,7 @@ SQLHolder MyChecker::openDB() const
 			"FROM member "
 			"LEFT JOIN struct ON member.struct=struct.id "
 			"LEFT JOIN source ON struct.src=source.id "
-			"WHERE member.id NOT IN (SELECT member FROM use) AND struct != ''",
+			"WHERE member.id NOT IN (SELECT member FROM use) AND struct.name != ''",
 	};
 
 	for (auto c: create_views) {
