@@ -1,5 +1,6 @@
 #include <sqlite3.h>
 
+#include <chrono>
 #include <filesystem>
 #include <thread>
 
@@ -379,10 +380,13 @@ void MatchCallback::run(const MatchFinder::MatchResult &res)
 
 static int busy_handler(void *data, int count)
 {
-	if (count >= 1000)
+	static const auto WAIT_INTVAL = std::chrono::milliseconds(20);
+	static const auto WAIT_TIMEOUT = std::chrono::minutes(20) / WAIT_INTVAL;
+
+	if (count >= WAIT_TIMEOUT)
 		return 0;
 
-	std::this_thread::sleep_for(std::min(count, 10) * std::chrono::milliseconds(50));
+	std::this_thread::sleep_for(WAIT_INTVAL);
 
 	return 1;
 }
