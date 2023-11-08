@@ -43,14 +43,25 @@ sub stop() {
 $SIG{'INT'} = \&stop;
 $SIG{'TERM'} = \&stop;
 
+my $period = time();
+
 foreach my $entry (@{$json}) {
 	last if $stop;
+
 	my $file = $entry->{'file'};
 	next unless ($file =~ /\.c$/);
 	next if (defined $filter && $file !~ $filter);
-	$pm->start and next;
+
+	# we need to flush sqlite busy waiters before they time out
+	if ($period - time() > 15 * 60) {
+		$period = time();
+		print STDERR "Flushing to the database, hold on\n";
+		$pm->wait_all_children;
+	}
 
 	print "$file\n";
+	$pm->start and next;
+
 	if ($verbose) {
 	    print "\tCMD=", substr($entry->{'command'}, 0, 50), "\n";
 	    print "\tDIR=", $entry->{'directory'}, "\n";
