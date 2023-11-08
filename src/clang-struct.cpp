@@ -463,16 +463,14 @@ SQLHolder MyChecker::openDB() const
 	static const llvm::SmallVector<const char *> create_views {
 		"structs_view AS "
 			"SELECT struct.id, struct.name AS struct, struct.attrs, source.src, "
-				"struct.begLine || ':' || struct.begCol || "
-				"'-' || struct.endLine || ':' || struct.endCol "
-				"AS location "
+				"struct.begLine || ':' || struct.begCol || '-' || "
+				"struct.endLine || ':' || struct.endCol AS location "
 			"FROM struct LEFT JOIN source ON struct.src=source.id",
 		"members_view AS "
 			"SELECT member.id, struct.name AS struct, "
 				"member.name AS member, source.src, "
-				"member.begLine || ':' || member.begCol "
-				"|| '-' || member.endLine || ':' || "
-				"member.endCol AS location "
+				"member.begLine || ':' || member.begCol || '-' || "
+				"member.endLine || ':' || member.endCol AS location "
 			"FROM member "
 			"LEFT JOIN struct ON member.struct=struct.id "
 			"LEFT JOIN source ON struct.src=source.id",
@@ -486,10 +484,14 @@ SQLHolder MyChecker::openDB() const
 			"LEFT JOIN struct ON member.struct=struct.id "
 			"LEFT JOIN source ON use.src=source.id",
 		"unused_view AS "
-			"SELECT struct, member, src, location "
-				"FROM members_view "
-				"WHERE id NOT IN (SELECT member FROM use) AND "
-					"struct != ''",
+			"SELECT struct.name AS struct, struct.attrs, member.name AS member, "
+				"source.src, "
+				"member.begLine || ':' || member.begCol || '-' || "
+				"member.endLine || ':' || member.endCol AS location "
+			"FROM member "
+			"LEFT JOIN struct ON member.struct=struct.id "
+			"LEFT JOIN source ON struct.src=source.id "
+			"WHERE member.id NOT IN (SELECT member FROM use) AND struct != ''",
 	};
 
 	for (auto c: create_views) {
