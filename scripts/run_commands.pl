@@ -1,18 +1,36 @@
 #!/usr/bin/perl
 use strict;
 use warnings;
+use DBI;
+use Cwd 'abs_path';
+use File::Spec;
 use Getopt::Long;
 use JSON;
 use Parallel::ForkManager;
 
 my $basepath = "";
+my $dbfile = 'structs.db';
 my $filter;
+my $skip = '';
 my $verbose = 0;
 GetOptions(
 	"basepath=s"	=> \$basepath,
 	"filter=s"	=> \$filter,
+	"skip"		=> \$skip,
 	"verbose+"	=> \$verbose)
 or die("Error in command line arguments\n");
+
+my %skip_files;
+if (-f $dbfile && $skip) {
+	my $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile","","") ||
+		die "connect to db error: " . DBI::errstr;
+	%skip_files = map {
+		my $abs = File::Spec->catfile($basepath, @{$_}[0]);
+		$abs = abs_path($abs);
+		$abs => 1
+	} $dbh->selectall_array(q@SELECT src FROM source WHERE src LIKE '%.c';@);
+	$dbh->disconnect;
+}
 
 my $json;
 {
@@ -51,6 +69,10 @@ foreach my $entry (@{$json}) {
 	my $file = $entry->{'file'};
 	next unless ($file =~ /\.c$/);
 	next if (defined $filter && $file !~ $filter);
+	if ($skip_files{$file}) {
+		print "$file skipped\n";
+		next;
+	}
 
 	# we need to flush sqlite busy waiters before they time out
 	if ($period - time() > 15 * 60) {
