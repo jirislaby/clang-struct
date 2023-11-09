@@ -198,6 +198,7 @@ void MatchCallback::handleME(const MemberExpr *ME)
 		ME->getSourceRange().dump(SM);
 		ME->dumpColor();
 		T->dump();
+		abort();
 	}
 }
 
