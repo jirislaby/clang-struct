@@ -97,7 +97,8 @@ std::filesystem::path MatchCallback::getSrc(const SourceLocation &SLOC)
 
 void MatchCallback::handleUse(const MemberExpr *ME, const RecordType *ST)
 {
-	auto strSrc = getSrc(ST->getDecl()->getBeginLoc());
+	auto strLoc = ST->getDecl()->getBeginLoc();
+	auto strSrc = getSrc(strLoc);
 	auto useSrc = getSrc(ME->getBeginLoc());
 	int ret;
 
@@ -120,12 +121,10 @@ void MatchCallback::handleUse(const MemberExpr *ME, const RecordType *ST)
 		return;
 	}
 
-	/*
-			":begLine, :begCol, :endLine, :endCol;",*/
 	SQLStmtResetter insUseResetter(sqlHolder, insUse);
 	ret = sqlite3_bind_text(insUse,
 				sqlite3_bind_parameter_index(insUse, ":member"),
-				ME->getMemberDecl()->getNameAsString().c_str(), -1,
+				getNDName(ME->getMemberDecl()).c_str(), -1,
 				SQLITE_TRANSIENT);
 	if (ret != SQLITE_OK) {
 		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
@@ -135,7 +134,7 @@ void MatchCallback::handleUse(const MemberExpr *ME, const RecordType *ST)
 	}
 	ret = sqlite3_bind_text(insUse,
 				sqlite3_bind_parameter_index(insUse, ":struct"),
-				ST->getDecl()->getNameAsString().c_str(), -1,
+				getRDName(ST->getDecl()).c_str(), -1,
 				SQLITE_TRANSIENT);
 	if (ret != SQLITE_OK) {
 		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
@@ -144,9 +143,27 @@ void MatchCallback::handleUse(const MemberExpr *ME, const RecordType *ST)
 		return;
 	}
 	ret = sqlite3_bind_text(insUse,
-				sqlite3_bind_parameter_index(insUse, ":str_src"),
+				sqlite3_bind_parameter_index(insUse, ":strSrc"),
 				strSrc.c_str(), -1,
 				SQLITE_TRANSIENT);
+	if (ret != SQLITE_OK) {
+		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
+				sqlite3_errstr(ret) << " -> " <<
+				sqlite3_errmsg(sqlHolder) << "\n";
+		return;
+	}
+	ret = sqlite3_bind_int(insUse,
+			       sqlite3_bind_parameter_index(insUse, ":strLine"),
+			       SM.getPresumedLineNumber(strLoc));
+	if (ret != SQLITE_OK) {
+		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
+				sqlite3_errstr(ret) << " -> " <<
+				sqlite3_errmsg(sqlHolder) << "\n";
+		return;
+	}
+	ret = sqlite3_bind_int(insUse,
+			       sqlite3_bind_parameter_index(insUse, ":strCol"),
+			       SM.getPresumedColumnNumber(strLoc));
 	if (ret != SQLITE_OK) {
 		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
 				sqlite3_errstr(ret) << " -> " <<
@@ -503,7 +520,9 @@ SQLHolder MyChecker::openDB() const
 			"FROM member "
 			"LEFT JOIN struct ON member.struct=struct.id "
 			"LEFT JOIN source ON struct.src=source.id "
-			"WHERE member.id NOT IN (SELECT member FROM use) AND struct.name != ''",
+			"WHERE member.id NOT IN (SELECT member FROM use) "
+				"AND struct.name != '<anonymous>' AND struct.name != '<unnamed>' "
+				"AND member.name != '<unnamed>'",
 	};
 
 	for (auto c: create_views) {
@@ -583,7 +602,9 @@ void MyChecker::checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
 						"LEFT JOIN source ON struct.src=source.id "
 						"WHERE member.name=:member AND "
 						"struct.name=:struct AND "
-						"source.src=:str_src), "
+						"source.src=:strSrc AND "
+						"struct.begLine=:strLine AND "
+						"struct.begCol=:strCol), "
 					"(SELECT id FROM source WHERE src=:use_src), "
 					":begLine, :begCol, :endLine, :endCol;",
 				 -1, &stmt, NULL);
