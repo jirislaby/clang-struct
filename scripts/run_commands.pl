@@ -1,17 +1,17 @@
 #!/usr/bin/perl
 use strict;
 use warnings;
-use Data::Dumper;
 use Getopt::Long;
 use JSON;
 use Parallel::ForkManager;
 
-my $filter;
 my $basepath = "";
+my $filter;
 my $verbose = 0;
-GetOptions ("filter=s" => \$filter,
-	    "basepath=s" => \$basepath,
-	    "verbose+"  => \$verbose)
+GetOptions(
+	"basepath=s"	=> \$basepath,
+	"filter=s"	=> \$filter,
+	"verbose+"	=> \$verbose)
 or die("Error in command line arguments\n");
 
 my $json;
