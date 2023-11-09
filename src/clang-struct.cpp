@@ -44,6 +44,7 @@ private:
 	void handleME(const MemberExpr *ME);
 	void handleRD(const RecordDecl *RD);
 
+	static std::string getNDName(const NamedDecl *ND);
 	static std::string getRDName(const RecordDecl *RD);
 
 	SourceManager &SM;
@@ -200,10 +201,20 @@ void MatchCallback::handleME(const MemberExpr *ME)
 	}
 }
 
+std::string MatchCallback::getNDName(const NamedDecl *ND)
+{
+	if (!ND->getIdentifier())
+		return "<unnamed>";
+
+	return ND->getNameAsString();
+}
+
 std::string MatchCallback::getRDName(const RecordDecl *RD)
 {
-	return RD->isAnonymousStructOrUnion() ? "<anonymous>" :
-						RD->getNameAsString();
+	if (RD->isAnonymousStructOrUnion())
+		return "<anonymous>";
+
+	return getNDName(RD);
 }
 
 void MatchCallback::handleRD(const RecordDecl *RD)
@@ -304,7 +315,7 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 		SQLStmtResetter insMemResetter(sqlHolder, insMem);
 		ret = sqlite3_bind_text(insMem,
 					sqlite3_bind_parameter_index(insMem, ":name"),
-					f->getNameAsString().c_str(), -1,
+					getNDName(f).c_str(), -1,
 					SQLITE_TRANSIENT);
 		if (ret != SQLITE_OK) {
 			llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
