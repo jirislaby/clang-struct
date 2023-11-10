@@ -1,0 +1,23 @@
+<h1>Listing structure <%= @struct.name %></h1>
+<div>
+  Defined in <%= @struct.source.src %> at line <%= @struct.begLine %>
+  column <%= @struct.begCol %>.
+  <table class="structs">
+    <thead>
+      <td>Member</td>
+      <td>Line</td>
+      <td>Column</td>
+    </thead>
+    <tbody>
+      <% @struct.member.each do |member| %>
+        <tr id="et<%= member.id %>">
+          <td><%= link_to(member.name, struct_use_path(@struct, member)) %>
+          </td>
+          <td><%= member.begLine %></td>
+          <td><%= member.begCol %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+<br />

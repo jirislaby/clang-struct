@@ -1,0 +1,20 @@
+<h1>Listing uses of <%= @uses[0].member.struct.name %>.<%= @uses[0].member.name %></h1>
+<div>
+  <table class="structs">
+    <thead>
+      <td>Source</td>
+      <td>Line</td>
+      <td>Column</td>
+    </thead>
+    <tbody>
+      <% @uses.each do |use| %>
+        <tr>
+          <td><%= use.source.src %></td>
+          <td><%= use.begLine %></td>
+          <td><%= use.begCol %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+<br />

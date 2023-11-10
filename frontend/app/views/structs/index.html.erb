@@ -1,0 +1,27 @@
+<h1>Listing structures</h1>
+<span>
+  Number of listed structures: <strong><%= @structs.count %></strong>
+</span>
+<div>
+  <table class="structs">
+    <thead>
+      <td>Number</td>
+      <td>Struct</td>
+      <td>Source</td>
+      <td>Line</td>
+      <td>Column</td>
+    </thead>
+    <tbody>
+      <% @structs.each_with_index do |struct, i| %>
+        <tr id="et<%= struct.id %>">
+          <td><%= i + 1 %></td>
+          <td><%= link_to(struct.name, struct_path(struct)) %></a></td>
+          <td><%= struct.source.src %></td>
+          <td><%= struct.begLine %></td>
+          <td><%= struct.begCol %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+<br />
