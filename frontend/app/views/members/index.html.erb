@@ -1,0 +1,36 @@
+<h1>Listing members</h1>
+<div>
+  <%= form_tag(members_path(), :method => "get") do %>
+    <label for="filter_file">Filter filename: </label><input id="filter_file" type="text" name="filter_file" value="<%= params[:filter_file] %>" />
+    <label for="filter">Filter struct/member: </label><input id="filter_struct" type="text" name="filter" value="<%= params[:filter] %>"/>
+    <label for="unused">Unused: </label><input id="unused" type="checkbox" name="unused" <%if params[:unused] %>checked="true"<%end%> />
+    <input type="submit" name="submit" />
+  <% end %>
+  <table class="structs">
+    <thead>
+      <td>Struct</td>
+      <td>Member</td>
+      <td>File</td>
+      <td>Line</td>
+      <td>Column</td>
+    </thead>
+    <tbody>
+      <% @members.each do |member| %>
+        <tr id="et<%= member.id %>">
+          <td><%= link_to(member.struct.name,
+                          "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/#{member.struct.source.src}?id=v6.6#n#{member.struct.begLine}")
+                          %></td>
+          <td><%= link_to(member.name,
+                          "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/#{member.struct.source.src}?id=v6.6#n#{member.begLine}")
+                          %></td>
+          <td><%= link_to(member.struct.source.src,
+                          "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/#{member.struct.source.src}?id=v6.6")
+                          %></td>
+          <td><%= member.begLine %></td>
+          <td><%= member.begCol %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+<br />

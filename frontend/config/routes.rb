@@ -9,6 +9,8 @@ Rails.application.routes.draw do
     resources :uses
   end
 
+  resources :members
+
   # Defines the root path route ("/")
   # root "posts#index"
   root :to => 'structs#index'
