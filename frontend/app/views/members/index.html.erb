@@ -4,6 +4,9 @@
     <%= form.label :unused, "Unused:" %>
     <%= form.check_box :unused, :checked => params[:unused] == "1" %>
   <% end %>
+  <div>
+    Number of listed members: <strong><%= @members.count %></strong>
+  </div>
   <table class="structs">
     <thead>
       <tr>
