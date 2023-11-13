@@ -5,17 +5,19 @@
 <div>
   <table class="structs">
     <thead>
-      <td>Number</td>
-      <td>Struct</td>
-      <td>Source</td>
-      <td>Line</td>
-      <td>Column</td>
+      <tr>
+        <td>Number</td>
+        <td>Struct</td>
+        <td>Source</td>
+        <td>Line</td>
+        <td>Column</td>
+      </tr>
     </thead>
     <tbody>
       <% @structs.each_with_index do |struct, i| %>
         <tr id="et<%= struct.id %>">
           <td><%= i + 1 %></td>
-          <td><%= link_to(struct.name, struct_path(struct)) %></a></td>
+          <td><%= link_to(struct.name, struct_path(struct)) %></td>
           <td><%= struct.source.src %></td>
           <td><%= struct.begLine %></td>
           <td><%= struct.begCol %></td>
@@ -24,4 +26,4 @@
     </tbody>
   </table>
 </div>
-<br />
+<br>
