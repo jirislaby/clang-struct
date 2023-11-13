@@ -18,7 +18,8 @@
       <% @structs.each_with_index do |struct, i| %>
         <tr id="et<%= struct.id %>">
           <td><%= i + 1 %></td>
-          <td><%= link_to(struct.name, struct_path(struct)) %></td>
+          <td><%= link_to(struct.name, struct_path(struct)) %>
+            (<%= src_link_to('src', struct.source.src, struct.begLine) %>)</td>
           <td><%= struct.source.src %></td>
           <td><%= struct.begLine %></td>
           <td><%= struct.begCol %></td>

@@ -14,7 +14,8 @@
       <% @struct.member.each do |member| %>
         <tr id="et<%= member.id %>">
           <td><%= link_to(member.name, struct_use_path(@struct, member)) %>
-          </td>
+            (<%= src_link_to('src', member.struct.source.src,
+                             member.begLine) %>)</td>
           <td><%= member.begLine %></td>
           <td><%= member.begCol %></td>
         </tr>

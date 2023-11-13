@@ -17,15 +17,13 @@
     <tbody>
       <% @members.each do |member| %>
         <tr id="et<%= member.id %>">
-          <td><%= link_to(member.struct.name,
-                          "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/#{member.struct.source.src}?id=v6.6#n#{member.struct.begLine}")
-                          %></td>
-          <td><%= link_to(member.name,
-                          "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/#{member.struct.source.src}?id=v6.6#n#{member.begLine}")
-                          %></td>
-          <td><%= link_to(member.struct.source.src,
-                          "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/#{member.struct.source.src}?id=v6.6")
-                          %></td>
+          <td><%= link_to(member.struct.name, struct_path(member.struct)) %>
+            (<%= src_link_to('src', member.struct.source.src,
+                             member.struct.begLine) %>)</td>
+          <td><%= src_link_to(member.name, member.struct.source.src,
+                              member.begLine) %></td>
+          <td><%= src_link_to(member.struct.source.src,
+                              member.struct.source.src) %></td>
           <td><%= member.begLine %></td>
           <td><%= member.begCol %></td>
         </tr>

@@ -11,7 +11,7 @@
     <tbody>
       <% @uses.each do |use| %>
         <tr>
-          <td><%= use.source.src %></td>
+          <td><%= src_link_to(use.source.src, use.source.src, use.begLine) %></td>
           <td><%= use.begLine %></td>
           <td><%= use.begCol %></td>
         </tr>
