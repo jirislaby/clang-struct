@@ -1,7 +1,7 @@
 class MembersController < ApplicationController
   def index
     @members = Member
-    if params[:unused] == 'on'
+    if params[:unused] == '1'
       @members = @members.unused
     end
     if params[:filter] != ''

@@ -1,6 +1,15 @@
 class StructsController < ApplicationController
   def index
-    @structs = MyStruct.joins(:source).order('source.src, struct.begLine').limit(100);
+    @structs = MyStruct
+    if params[:filter] != ''
+      @filter = "%#{params[:filter]}%"
+      @structs = @structs.where('struct.name LIKE ?', @filter)
+    end
+    if params[:filter_file] != ''
+      @filter = "%#{params[:filter_file]}%"
+      @structs = @structs.where('source.src LIKE ?', @filter)
+    end
+    @structs = @structs.joins(:source).order('source.src, struct.begLine').limit(100);
 
     respond_to do |format|
       format.html

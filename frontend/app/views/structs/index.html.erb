@@ -1,8 +1,9 @@
 <h1>Listing structures</h1>
-<span>
-  Number of listed structures: <strong><%= @structs.count %></strong>
-</span>
 <div>
+  <%= render 'shared/search_filters' %>
+  <div>
+    Number of listed structures: <strong><%= @structs.count %></strong>
+  </div>
   <table class="structs">
     <thead>
       <tr>

@@ -1,10 +1,8 @@
 <h1>Listing members</h1>
 <div>
-  <%= form_tag(members_path(), :method => "get") do %>
-    <label for="filter_file">Filter filename: </label><input id="filter_file" type="text" name="filter_file" value="<%= params[:filter_file] %>">
-    <label for="filter_struct">Filter struct/member: </label><input id="filter_struct" type="text" name="filter" value="<%= params[:filter] %>">
-    <label for="unused">Unused: </label><input id="unused" type="checkbox" name="unused" <%if params[:unused] %>checked<%end%>>
-    <input type="submit" name="submit">
+  <%= render 'shared/search_filters' do |form| %>
+    <%= form.label :unused, "Unused:" %>
+    <%= form.check_box :unused, :checked => params[:unused] == "1" %>
   <% end %>
   <table class="structs">
     <thead>

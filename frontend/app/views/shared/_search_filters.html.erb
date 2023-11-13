@@ -1,0 +1,8 @@
+<%= form_with method: :get do |form| %>
+  <%= form.label :filter_file, "Filter filename:" %>
+  <%= form.text_field :filter_file, :value => params[:filter_file] %>
+  <%= form.label :filter_struct, "Filter struct/member:" %>
+  <%= form.text_field :filter_struct, :name => 'filter', :value => params[:filter] %>
+  <%= yield form %>
+  <%= form.submit 'Submit' %>
+<% end %>
