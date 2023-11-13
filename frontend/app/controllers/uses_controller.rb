@@ -9,7 +9,7 @@ class UsesController < ApplicationController
 
   def show
     @member = Member.joins(:struct).find(params[:id])
-    @uses = Use.where(member: @member).joins(:member, :source)
+    @uses = Use.where(member: @member).joins(:member, :source).order('source.src, begLine')
 
     respond_to do |format|
       format.html
