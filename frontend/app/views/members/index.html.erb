@@ -5,8 +5,9 @@
     <%= form.check_box :unused, :checked => params[:unused] == "1" %>&nbsp;
   <% end %>
   <div>
-    Number of listed members: <strong><%= @members_count %></strong>
+    Listing <strong><%= @offset %>-<%= @offset + @members_count %>/<%= @members__all_count %></strong> structures:
   </div>
+  <%= render 'shared/prev_next' %>
   <table class="structs">
     <thead>
       <tr>
@@ -33,5 +34,6 @@
       <% end %>
     </tbody>
   </table>
+  <%= render 'shared/prev_next' %>
 </div>
 <br>

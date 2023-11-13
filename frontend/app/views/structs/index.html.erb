@@ -2,8 +2,9 @@
 <div>
   <%= render 'shared/search_filters' %>
   <div>
-    Number of listed structures: <strong><%= @structs_count %></strong>
+    Listing <strong><%= @offset %>-<%= @offset + @structs_count %>/<%= @structs_all_count %></strong> structures:
   </div>
+  <%= render 'shared/prev_next' %>
   <table class="structs">
     <thead>
       <tr>
@@ -17,7 +18,7 @@
     <tbody>
       <% @structs.each_with_index do |struct, i| %>
         <tr id="et<%= struct.id %>">
-          <td><%= i + 1 %></td>
+          <td><%= @offset + i + 1 %></td>
           <td><%= link_to(struct.name, struct_path(struct)) %>
             (<%= src_link_to('src', struct.src_file, struct.begLine) %>)</td>
           <td><%= struct.src_file %></td>
@@ -27,5 +28,6 @@
       <% end %>
     </tbody>
   </table>
+  <%= render 'shared/prev_next' %>
 </div>
 <br>
