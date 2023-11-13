@@ -13,7 +13,7 @@ class MembersController < ApplicationController
       @filter = "%#{params[:filter_file]}%"
       @members = @members.where('source.src LIKE ?', @filter)
     end
-    @members = @members.joins({:struct => :source}).order('struct.name, member.begLine').limit(100);
+    @members = @members.joins({:struct => :source}).order('struct.name, member.begLine').limit(500);
 
     respond_to do |format|
       format.html
