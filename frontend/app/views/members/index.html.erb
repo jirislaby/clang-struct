@@ -20,8 +20,9 @@
           <td><%= link_to(member.struct.name, struct_path(member.struct)) %>
             (<%= src_link_to('src', member.struct.source.src,
                              member.struct.begLine) %>)</td>
-          <td><%= src_link_to(member.name, member.struct.source.src,
-                              member.begLine) %></td>
+          <td><%= link_to(member.name, struct_use_path(member.struct, member)) %>
+            (<%= src_link_to('src', member.struct.source.src,
+                             member.begLine) %>)</td>
           <td><%= src_link_to(member.struct.source.src,
                               member.struct.source.src) %></td>
           <td><%= member.begLine %></td>
