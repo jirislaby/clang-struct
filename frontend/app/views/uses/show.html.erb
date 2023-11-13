@@ -1,7 +1,7 @@
 <h1>Listing uses of <%= @member.struct.name %>.<%= @member.name %></h1>
 <div>
   <div>
-    Number of listed uses: <strong><%= @uses.count %></strong>
+    Number of listed uses: <strong><%= @uses_count %></strong>
   </div>
   <table class="structs">
     <thead>
@@ -14,7 +14,7 @@
     <tbody>
       <% @uses.each do |use| %>
         <tr>
-          <td><%= src_link_to(use.source.src, use.source.src, use.begLine) %></td>
+          <td><%= src_link_to(use.src_file, use.src_file, use.begLine) %></td>
           <td><%= use.begLine %></td>
           <td><%= use.begCol %></td>
         </tr>

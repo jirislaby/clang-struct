@@ -9,7 +9,10 @@ class StructsController < ApplicationController
       @filter = "%#{params[:filter_file]}%"
       @structs = @structs.where('source.src LIKE ?', @filter)
     end
-    @structs = @structs.joins(:source).order('source.src, struct.begLine').limit(500);
+    @structs = @structs.joins(:source).limit(500)
+    @structs_count = @structs.count
+    @structs = @structs.select('struct.*', 'source.src AS src_file').
+      order('src_file, struct.begLine')
 
     respond_to do |format|
       format.html

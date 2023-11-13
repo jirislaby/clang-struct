@@ -5,7 +5,7 @@
     <%= form.check_box :unused, :checked => params[:unused] == "1" %>&nbsp;
   <% end %>
   <div>
-    Number of listed members: <strong><%= @members.count %></strong>
+    Number of listed members: <strong><%= @members_count %></strong>
   </div>
   <table class="structs">
     <thead>
@@ -20,14 +20,13 @@
     <tbody>
       <% @members.each do |member| %>
         <tr id="et<%= member.id %>">
-          <td><%= link_to(member.struct.name, struct_path(member.struct)) %>
-            (<%= src_link_to('src', member.struct.source.src,
-                             member.struct.begLine) %>)</td>
-          <td><%= link_to(member.name, struct_use_path(member.struct, member)) %>
-            (<%= src_link_to('src', member.struct.source.src,
+          <td><%= link_to(member.struct_name, struct_path(member.struct_id)) %>
+            (<%= src_link_to('src', member.src_file,
+                             member.struct_begLine) %>)</td>
+          <td><%= link_to(member.name, struct_use_path(member.struct_id, member)) %>
+            (<%= src_link_to('src', member.src_file,
                              member.begLine) %>)</td>
-          <td><%= src_link_to(member.struct.source.src,
-                              member.struct.source.src) %></td>
+          <td><%= src_link_to(member.src_file, member.src_file) %></td>
           <td><%= member.begLine %></td>
           <td><%= member.begCol %></td>
         </tr>
