@@ -2,7 +2,7 @@
 <div>
   <%= render 'shared/search_filters' do |form| %>
     <%= form.label :unused, "Unused:" %>
-    <%= form.check_box :unused, :checked => params[:unused] == "1" %>
+    <%= form.check_box :unused, :checked => params[:unused] == "1" %>&nbsp;
   <% end %>
   <div>
     Number of listed members: <strong><%= @members.count %></strong>
