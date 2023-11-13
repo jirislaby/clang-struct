@@ -8,7 +8,8 @@ class UsesController < ApplicationController
 #  end
 
   def show
-    @uses = Use.where(member: params[:id]).joins(:member, :source)
+    @member = Member.joins(:struct).find(params[:id])
+    @uses = Use.where(member: @member).joins(:member, :source)
 
     respond_to do |format|
       format.html
