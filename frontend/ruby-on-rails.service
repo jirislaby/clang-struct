@@ -1,0 +1,16 @@
+[Unit]
+Description=Ruby on Rails
+Requires=network.target
+After=network.target
+
+[Service]
+ExecStartPre=bundle exec rake assets:clean
+ExecStartPre=bundle exec rake assets:precompile
+ExecStart=bundle exec rails server -e production
+User=XXX
+WorkingDirectory=XXX
+Type=exec
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
