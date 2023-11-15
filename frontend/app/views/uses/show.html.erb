@@ -1,4 +1,4 @@
-<h1>Listing uses of <%= @member.struct.name %>.<%= @member.name %></h1>
+<h1>Listing uses of <span class="backlink"><%= link_to(@member.struct.name, struct_path(@member.struct)) %>.<%= @member.name %></span></h1>
 <div>
   <div>
     Number of listed uses: <strong><%= @uses_count %></strong>

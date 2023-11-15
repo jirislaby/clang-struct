@@ -23,6 +23,63 @@ body{
         padding: 0px 0px 0px 0px;
 }
 
+#content_wrap {
+	max-width: 80%; /* 1200px; */
+	-moz-box-shadow: 0px 0px 10px #333333;
+	-webkit-box-shadow: 0px 0px 10px #333333;
+	box-shadow: 0px 0px 10px #333333;
+	margin-left: auto;
+	margin-right: auto;
+	background-color: #ffffff;
+}
+
+#body_wrap {
+	padding: 20px 30px 20px 30px;
+}
+
+#top_wrap{
+	float:left;
+	width: 100%;
+	border-bottom: 1px solid #333333;
+	margin-bottom: 15px;
+	background: #d0d0f0;
+}
+
+#top_bar{
+	padding: 0px 30px;
+}
+
+#menu {
+	margin: 15px 0px;
+	font-size: 120%;
+	font-weight: bold;
+}
+
+#menu span {
+	padding-left: 1em;
+	padding-right: 1em;
+	border-left: 2px solid;
+}
+
+#menu span:first-child {
+	padding-left: 0px;
+	border-left: none;
+}
+
+#menu a {
+	text-decoration: none;
+	color: #555;
+}
+
+#menu a:hover {
+	text-decoration: underline;
+	color: #333;
+}
+
+.search_line {
+	padding: 12px 0px;
+}
+
 table{
         -moz-box-shadow: 0px 0px 10px #333;
         -webkit-box-shadow: 0px 0px 10px #333;
@@ -75,20 +132,35 @@ input[type="submit"] {
 }
 
 .prev_next {
-	font-size: 120%;
+	font-size: 110%;
 	font-weight: bold;
-	padding: 10px;
+	text-align: right;
+	margin-left: auto;
+	margin-right: auto;
+	width: 90%;
 }
 
 h1.main_title{
         font-size: 230%;
 }
 h1.main_title a {
+	color: #e22;
         text-decoration: none;
 }
 
 h1.main_title a:hover {
         color: #333;
+        text-decoration: underline;
+}
+
+.backlink a {
+	color: #555;
+	text-decoration: none;
+}
+
+.backlink a:hover {
+	color: #333;
+	text-decoration: underline;
 }
 
 .structs {
@@ -139,3 +211,23 @@ h1.main_title a:hover {
 .structs tr:nth-child(odd) {
         background-color: #D6D6D6;
 }
+
+#top_box{
+	position: fixed;
+	left: 0px;
+	bottom: 100px;
+	font-weight: bold;
+	text-align: center;
+	font-size: 22px;
+	width: 30px;
+	height: 30px;
+	background-color: #ffffff;
+	-moz-box-shadow: 0px 0px 3px #333;
+	-webkit-box-shadow: 0px 0px 3px #333;
+	box-shadow: 0px 0px 3px #333;
+	-moz-border-radius-bottomright: 10px;
+	border-bottom-right-radius: 10px;
+	-moz-border-radius-topright: 10px;
+	border-top-right-radius: 10px;
+}
+

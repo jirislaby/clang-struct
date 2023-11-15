@@ -1,4 +1,4 @@
-<h1>Listing members</h1>
+<h1>Listing <% if params[:unused] == "1" %>potentially unused<% end %> members</h1>
 <div>
   <%= render 'shared/search_filters' do |form| %>
     <%= form.label :unused, "Unused:" %>

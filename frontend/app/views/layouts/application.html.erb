@@ -11,6 +11,24 @@
   </head>
 
   <body>
-    <%= yield %>
+    <div id="content_wrap">
+      <a href="#top" name="top"></a>
+      <div id="top_wrap">
+        <div id="top_bar">
+          <h1 class="main_title"><%= link_to('clang-struct', '/') %> &ndash; indexed structures of the kernel</h1>
+          <div id="menu">
+            <span><%= link_to('Structures list', structs_path()) %></span>
+            <span><%= link_to('Members list', members_path()) %></span>
+            <span><%= link_to('Potentially unused members list', members_path(unused: 1)) %></span>
+          </div>
+        </div>
+      </div>
+      <div id="body_wrap">
+        <%= yield %>
+      </div>
+    </div>
+    <div id="top_box">
+      <a href="#top">&uarr;</a>
+    </div>
   </body>
 </html>
