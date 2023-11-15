@@ -7,33 +7,35 @@
   <div>
     Listing <strong><%= @offset %>-<%= @offset + @members_count %>/<%= @members_all_count %></strong> members.
   </div>
-  <%= render 'shared/prev_next' %>
-  <table class="structs">
-    <thead>
-      <tr>
-        <td>Struct</td>
-        <td>Member</td>
-        <td>File</td>
-        <td>Line</td>
-        <td>Column</td>
-      </tr>
-    </thead>
-    <tbody>
-      <% @members.each do |member| %>
-        <tr id="et<%= member.id %>">
-          <td><%= link_to(member.struct_name, struct_path(member.struct_id)) %>
+  <% if @members_count > 0 %>
+    <%= render 'shared/prev_next' %>
+    <table class="structs">
+      <thead>
+        <tr>
+          <td>Struct</td>
+          <td>Member</td>
+          <td>File</td>
+          <td>Line</td>
+          <td>Column</td>
+        </tr>
+      </thead>
+      <tbody>
+        <% @members.each do |member| %>
+          <tr id="et<%= member.id %>">
+            <td><%= link_to(member.struct_name, struct_path(member.struct_id)) %>
             (<%= src_link_to('src', member.src_file,
                              member.struct_begLine) %>)</td>
-          <td><%= link_to(member.name, struct_use_path(member.struct_id, member)) %>
+            <td><%= link_to(member.name, struct_use_path(member.struct_id, member)) %>
             (<%= src_link_to('src', member.src_file,
                              member.begLine) %>)</td>
-          <td><%= src_link_to(member.src_file, member.src_file) %></td>
-          <td><%= member.begLine %></td>
-          <td><%= member.begCol %></td>
-        </tr>
-      <% end %>
-    </tbody>
-  </table>
-  <%= render 'shared/prev_next' %>
+            <td><%= src_link_to(member.src_file, member.src_file) %></td>
+            <td><%= member.begLine %></td>
+            <td><%= member.begCol %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+    <%= render 'shared/prev_next' %>
+  <% end %>
 </div>
 <br>

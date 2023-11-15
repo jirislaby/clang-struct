@@ -4,30 +4,32 @@
   <div>
     Listing <strong><%= @offset %>-<%= @offset + @structs_count %>/<%= @structs_all_count %></strong> structures.
   </div>
-  <%= render 'shared/prev_next' %>
-  <table class="structs">
-    <thead>
-      <tr>
-        <td>Number</td>
-        <td>Struct</td>
-        <td>Source</td>
-        <td>Line</td>
-        <td>Column</td>
-      </tr>
-    </thead>
-    <tbody>
-      <% @structs.each_with_index do |struct, i| %>
-        <tr id="et<%= struct.id %>">
-          <td><%= @offset + i + 1 %></td>
-          <td><%= link_to(struct.name, struct_path(struct)) %>
-            (<%= src_link_to('src', struct.src_file, struct.begLine) %>)</td>
-          <td><%= struct.src_file %></td>
-          <td><%= struct.begLine %></td>
-          <td><%= struct.begCol %></td>
+  <% if @structs_count > 0 %>
+    <%= render 'shared/prev_next' %>
+    <table class="structs">
+      <thead>
+        <tr>
+          <td>Number</td>
+          <td>Struct</td>
+          <td>Source</td>
+          <td>Line</td>
+          <td>Column</td>
         </tr>
-      <% end %>
-    </tbody>
-  </table>
-  <%= render 'shared/prev_next' %>
+      </thead>
+      <tbody>
+        <% @structs.each_with_index do |struct, i| %>
+          <tr id="et<%= struct.id %>">
+            <td><%= @offset + i + 1 %></td>
+            <td><%= link_to(struct.name, struct_path(struct)) %>
+            (<%= src_link_to('src', struct.src_file, struct.begLine) %>)</td>
+            <td><%= struct.src_file %></td>
+            <td><%= struct.begLine %></td>
+            <td><%= struct.begCol %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+    <%= render 'shared/prev_next' %>
+  <% end %>
 </div>
 <br>
