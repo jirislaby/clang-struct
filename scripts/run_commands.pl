@@ -75,7 +75,7 @@ foreach my $entry (@{$json}) {
 	}
 
 	# we need to flush sqlite busy waiters before they time out
-	if ($period - time() > 15 * 60) {
+	if (time() - $period > 15 * 60) {
 		$period = time();
 		print STDERR "Flushing to the database, hold on\n";
 		$pm->wait_all_children;
