@@ -4,24 +4,23 @@ class MembersController < ApplicationController
     if params[:unused] == '1'
       @members = @members.unused
     end
-    if params[:filter] != ''
+    unless params[:filter].blank?
       @filter = "%#{params[:filter]}%"
       @members = @members.where('member.name LIKE ? OR struct.name LIKE ?',
                                 @filter, @filter)
     end
-    if params[:filter_file] != ''
+    unless params[:filter_file].blank?
       @filter = "%#{params[:filter_file]}%"
       @members = @members.where('source.src LIKE ?', @filter)
     end
-    @members = @members.joins({:struct => :source})
+    @members = @members.left_joins({:struct => :source})
     @members_all_count = @members.count # ALL COUNT
 
-    if params[:page] != ''
+    @page = @offset = 0
+    unless params[:page].blank?
       @page = params[:page].to_i
       @offset = @page * listing_limit
       @members = @members.offset(@offset)
-    else
-      @page = @offset = 0
     end
     @members = @members.limit(listing_limit)
     @members_count = @members.count # COUNT
