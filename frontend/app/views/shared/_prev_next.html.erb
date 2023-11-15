@@ -1,4 +1,4 @@
 <div class="prev_next">
-  <%= link_to_if(@page > 0, '[Prev]', structs_path(request.params.merge({page: @page - 1}))) %>
-  <%= link_to_if(@next_page > 0, '[Next]', structs_path(request.params.merge({page: @next_page}))) %>
+  <%= link_to_if(@page > 0, '[Prev]', request.params.merge({page: @page - 1})) %>
+  <%= link_to_if(@next_page > 0, '[Next]', request.params.merge({page: @next_page})) %>
 </div>
