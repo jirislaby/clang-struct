@@ -1,26 +1,43 @@
-#include <sqlite3.h>
-
-#include <chrono>
 #include <filesystem>
-#include <thread>
+
+//#include <unistd.h>
+
+#include <fcntl.h>
+#include <mqueue.h>
+
+//#include <sys/socket.h>
+//#include <sys/un.h>
+#include <sys/stat.h>
 
 #include "clang/ASTMatchers/ASTMatchFinder.h"
 #include "clang/StaticAnalyzer/Core/Checker.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/AnalysisManager.h"
 #include "clang/StaticAnalyzer/Frontend/CheckerRegistry.h"
 
-#include "sqlite.h"
+#include "Message.h"
 
 using namespace clang;
 using namespace clang::ast_matchers;
 using namespace clang::ento;
 
+class Connection {
+public:
+	Connection() {}
+	~Connection();
+
+	int open();
+	void write(const Message &msg);
+private:
+#if 0
+	int sock = -1;
+#else
+	mqd_t mq = -1;
+#endif
+
+};
+
 namespace {
 class MyChecker final : public Checker<check::EndOfTranslationUnit> {
-
-private:
-	SQLHolder openDB() const;
-
 public:
   void checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
 				 AnalysisManager &A, BugReporter &BR) const;
@@ -28,17 +45,14 @@ public:
 
 class MatchCallback : public MatchFinder::MatchCallback {
 public:
-	MatchCallback(SourceManager &SM, SQLHolder &sqlHolder,
-		      SQLStmtHolder &insSrc, SQLStmtHolder &insStr,
-		      SQLStmtHolder &insMem, SQLStmtHolder &insUse,
+	MatchCallback(SourceManager &SM, Connection &conn,
 		      std::filesystem::path &basePath) :
-		SM(SM), sqlHolder(sqlHolder), insSrc(insSrc), insStr(insStr),
-		insMem(insMem), insUse(insUse), basePath(basePath) { }
+		SM(SM), conn(conn), basePath(basePath) { }
 
 	void run(const MatchFinder::MatchResult &res);
 private:
-	int bindLoc(SQLStmtHolder &stmt, const SourceRange &SR);
-	std::filesystem::path getSrc(const SourceLocation &SLOC);
+	void bindLoc(Message &msg, const SourceRange &SR);
+	std::string getSrc(const SourceLocation &SLOC);
 
 	void handleUse(const MemberExpr *ME, const RecordType *ST);
 	void handleME(const MemberExpr *ME);
@@ -49,41 +63,85 @@ private:
 
 	SourceManager &SM;
 
-	SQLHolder &sqlHolder;
-	SQLStmtHolder &insSrc;
-	SQLStmtHolder &insStr;
-	SQLStmtHolder &insMem;
-	SQLStmtHolder &insUse;
+	Connection &conn;
 	std::filesystem::path &basePath;
 };
 
 }
 
-int MatchCallback::bindLoc(SQLStmtHolder &stmt, const SourceRange &SR)
+Connection::~Connection()
 {
-	int ret;
-
-	ret = sqlite3_bind_int(stmt,
-			       sqlite3_bind_parameter_index(stmt, ":begLine"),
-			       SM.getPresumedLineNumber(SR.getBegin()));
-	if (ret != SQLITE_OK)
-		return ret;
-	ret = sqlite3_bind_int(stmt,
-			       sqlite3_bind_parameter_index(stmt, ":begCol"),
-			       SM.getPresumedColumnNumber(SR.getBegin()));
-	if (ret != SQLITE_OK)
-		return ret;
-	ret = sqlite3_bind_int(stmt,
-			       sqlite3_bind_parameter_index(stmt, ":endLine"),
-			       SM.getPresumedLineNumber(SR.getEnd()));
-	if (ret != SQLITE_OK)
-		return ret;
-	return sqlite3_bind_int(stmt,
-				sqlite3_bind_parameter_index(stmt, ":endCol"),
-				SM.getPresumedColumnNumber(SR.getEnd()));
+#if 0
+	if (sock >= 0)
+		close(sock);
+#else
+	if (mq >= 0)
+		mq_close(mq);
+#endif
 }
 
-std::filesystem::path MatchCallback::getSrc(const SourceLocation &SLOC)
+int Connection::open()
+{
+#if 0
+	sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
+	if (sock < 0) {
+		llvm::errs() << "cannot create socket: " << strerror(errno) << "\n";
+		return -1;
+	}
+
+	struct sockaddr_un addr = {
+		.sun_family = AF_UNIX,
+		.sun_path = "db_filler",
+	};
+
+	int ret = connect(sock, (const struct sockaddr *)&addr, sizeof(addr));
+	if (ret < 0) {
+		llvm::errs() << "cannot connect: " << strerror(errno) << "\n";
+		return -1;
+	}
+#else
+	mq = mq_open("/db_filler", O_WRONLY,  0600, NULL);
+	if (mq < 0) {
+		llvm::errs() << "cannot open msg queue: " << strerror(errno) << "\n";
+		return -1;
+	}
+#endif
+
+	return 0;
+}
+
+void Connection::write(const Message &msg)
+{
+#if 0
+	auto ret = ::write(sock, msg.c_str(), msg.length());
+	if (ret < 0) {
+		llvm::errs() << "write: " << strerror(errno) << "\n";
+		return;
+	}
+
+	if ((size_t)ret != msg.length())
+		llvm::errs() << "stray write: " << ret << "/" << msg.length() << "\n";
+#else
+	auto msgStr = msg.serialize();
+
+	//std::cerr << "sending: " << msg << "\n";
+
+	if (mq_send(mq, msgStr.c_str(), msgStr.length(), 0) < 0) {
+		llvm::errs() << "mq_send: " << strerror(errno) << "\n";
+		return;
+	}
+#endif
+}
+
+void MatchCallback::bindLoc(Message &msg, const SourceRange &SR)
+{
+	msg.add("begLine", SM.getPresumedLineNumber(SR.getBegin()));
+	msg.add("begCol", SM.getPresumedColumnNumber(SR.getBegin()));
+	msg.add("endLine", SM.getPresumedLineNumber(SR.getEnd()));
+	msg.add("endCol", SM.getPresumedColumnNumber(SR.getEnd()));
+}
+
+std::string MatchCallback::getSrc(const SourceLocation &SLOC)
 {
 	auto src = SM.getPresumedLoc(SLOC).getFilename();
 
@@ -92,7 +150,7 @@ std::filesystem::path MatchCallback::getSrc(const SourceLocation &SLOC)
 	if (!basePath.empty())
 		ret = std::filesystem::relative(ret, basePath);
 
-	return ret;
+	return ret.string();
 }
 
 void MatchCallback::handleUse(const MemberExpr *ME, const RecordType *ST)
@@ -100,100 +158,22 @@ void MatchCallback::handleUse(const MemberExpr *ME, const RecordType *ST)
 	auto strLoc = ST->getDecl()->getBeginLoc();
 	auto strSrc = getSrc(strLoc);
 	auto useSrc = getSrc(ME->getBeginLoc());
-	int ret;
+	Message msg(Message::KIND::SOURCE);
 
-	SQLStmtResetter insSrcResetter(sqlHolder, insSrc);
-	ret = sqlite3_bind_text(insSrc,
-				sqlite3_bind_parameter_index(insSrc, ":src"),
-				useSrc.c_str(), -1,
-				SQLITE_TRANSIENT);
-	if (ret != SQLITE_OK) {
-		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " <<
-				sqlite3_errmsg(sqlHolder) << "\n";
-		return;
-	}
-	ret = sqlite3_step(insSrc);
-	if (ret != SQLITE_DONE) {
-		llvm::errs() << "db step failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " <<
-				sqlite3_errmsg(sqlHolder) << "\n";
-		return;
-	}
+	msg.add("src", useSrc);
+	conn.write(msg);
 
-	SQLStmtResetter insUseResetter(sqlHolder, insUse);
-	ret = sqlite3_bind_text(insUse,
-				sqlite3_bind_parameter_index(insUse, ":member"),
-				getNDName(ME->getMemberDecl()).c_str(), -1,
-				SQLITE_TRANSIENT);
-	if (ret != SQLITE_OK) {
-		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " <<
-				sqlite3_errmsg(sqlHolder) << "\n";
-		return;
-	}
-	ret = sqlite3_bind_text(insUse,
-				sqlite3_bind_parameter_index(insUse, ":struct"),
-				getRDName(ST->getDecl()).c_str(), -1,
-				SQLITE_TRANSIENT);
-	if (ret != SQLITE_OK) {
-		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " <<
-				sqlite3_errmsg(sqlHolder) << "\n";
-		return;
-	}
-	ret = sqlite3_bind_text(insUse,
-				sqlite3_bind_parameter_index(insUse, ":strSrc"),
-				strSrc.c_str(), -1,
-				SQLITE_TRANSIENT);
-	if (ret != SQLITE_OK) {
-		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " <<
-				sqlite3_errmsg(sqlHolder) << "\n";
-		return;
-	}
-	ret = sqlite3_bind_int(insUse,
-			       sqlite3_bind_parameter_index(insUse, ":strLine"),
-			       SM.getPresumedLineNumber(strLoc));
-	if (ret != SQLITE_OK) {
-		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " <<
-				sqlite3_errmsg(sqlHolder) << "\n";
-		return;
-	}
-	ret = sqlite3_bind_int(insUse,
-			       sqlite3_bind_parameter_index(insUse, ":strCol"),
-			       SM.getPresumedColumnNumber(strLoc));
-	if (ret != SQLITE_OK) {
-		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " <<
-				sqlite3_errmsg(sqlHolder) << "\n";
-		return;
-	}
-	ret = sqlite3_bind_text(insUse,
-				sqlite3_bind_parameter_index(insUse, ":use_src"),
-				useSrc.c_str(), -1,
-				SQLITE_TRANSIENT);
-	if (ret != SQLITE_OK) {
-		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " <<
-				sqlite3_errmsg(sqlHolder) << "\n";
-		return;
-	}
-	ret = bindLoc(insUse, ME->getSourceRange());
-	if (ret != SQLITE_OK) {
-		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " <<
-				sqlite3_errmsg(sqlHolder) << "\n";
-		return;
-	}
-	ret = sqlite3_step(insUse);
-	if (ret != SQLITE_DONE) {
-		llvm::errs() << "db step failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " <<
-				sqlite3_errmsg(sqlHolder) << "\n";
-		return;
-	}
+	msg.renew(Message::KIND::USE);
+	msg.add("member", getNDName(ME->getMemberDecl()));
+	msg.add("struct", getRDName(ST->getDecl()));
+	msg.add("strSrc", strSrc);
+	msg.add("strLine", SM.getPresumedLineNumber(strLoc));
+	msg.add("strCol", SM.getPresumedColumnNumber(strLoc));
+	msg.add("use_src", useSrc);
+
+	bindLoc(msg, ME->getSourceRange());
+
+	conn.write(msg);
 }
 
 void MatchCallback::handleME(const MemberExpr *ME)
@@ -240,30 +220,18 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 	//RD->dumpColor();
 
 	auto RDSR = RD->getSourceRange();
+	auto RDName = getRDName(RD);
 	auto src = getSrc(RDSR.getBegin());
-	int ret;
+	Message msg(Message::KIND::SOURCE);
 
-	SQLStmtResetter insSrcResetter(sqlHolder, insSrc);
-	ret = sqlite3_bind_text(insSrc,
-				sqlite3_bind_parameter_index(insSrc, ":src"),
-				src.c_str(), -1,
-				SQLITE_TRANSIENT);
-	if (ret != SQLITE_OK) {
-		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " <<
-				sqlite3_errmsg(sqlHolder) << "\n";
-		return;
-	}
-	ret = sqlite3_step(insSrc);
-	if (ret != SQLITE_DONE) {
-		llvm::errs() << "db step failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " <<
-				sqlite3_errmsg(sqlHolder) << "\n";
-		return;
-	}
+	msg.add("src", src);
+	conn.write(msg);
 
+	msg.renew(Message::KIND::STRUCT);
+	msg.add("name", RDName);
+
+	std::stringstream ss;
 	bool cont = false;
-	std::stringstream attrs;
 	for (const auto &f : RD->attrs()) {
 		// implicit attrs don't have names
 		if (!f->getAttrName()) {
@@ -274,125 +242,30 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 			continue;
 		}
 		if (cont)
-			attrs << "|";
-		attrs << f->getNormalizedFullName();
+			ss << "|";
+		ss << f->getNormalizedFullName();
 		cont = true;
 	}
 
-	SQLStmtResetter insStrResetter(sqlHolder, insStr);
-	ret = sqlite3_bind_text(insStr,
-				sqlite3_bind_parameter_index(insStr, ":name"),
-				getRDName(RD).c_str(), -1,
-				SQLITE_TRANSIENT);
-	if (ret != SQLITE_OK) {
-		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " <<
-				sqlite3_errmsg(sqlHolder) << "\n";
-		return;
-	}
-	ret = sqlite3_bind_text(insStr,
-				sqlite3_bind_parameter_index(insStr, ":attrs"),
-				attrs.str().c_str(), -1,
-				SQLITE_TRANSIENT);
-	if (ret != SQLITE_OK) {
-		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " <<
-				sqlite3_errmsg(sqlHolder) << "\n";
-		return;
-	}
-	ret = sqlite3_bind_text(insStr,
-				sqlite3_bind_parameter_index(insStr, ":src"),
-				src.c_str(), -1,
-				SQLITE_TRANSIENT);
-	if (ret != SQLITE_OK) {
-		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " <<
-				sqlite3_errmsg(sqlHolder) << "\n";
-		return;
-	}
-	ret = bindLoc(insStr, RDSR);
-	if (ret != SQLITE_OK) {
-		llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " <<
-				sqlite3_errmsg(sqlHolder) << "\n";
-		return;
-	}
-	ret = sqlite3_step(insStr);
-	if (ret != SQLITE_DONE) {
-		llvm::errs() << "db step failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " <<
-				sqlite3_errmsg(sqlHolder) << "\n";
-		return;
-	}
+	msg.add("attrs", ss.str());
+	msg.add("src", src);
+	bindLoc(msg, RDSR);
+	conn.write(msg);
 
 	for (const auto &f : RD->fields()) {
 		//f->dumpColor();
 		/*llvm::errs() << __func__ << ": " << RD->getNameAsString() <<
 				"." << f->getNameAsString() << "\n";*/
 		auto SR = f->getSourceRange();
-		SQLStmtResetter insMemResetter(sqlHolder, insMem);
-		ret = sqlite3_bind_text(insMem,
-					sqlite3_bind_parameter_index(insMem, ":name"),
-					getNDName(f).c_str(), -1,
-					SQLITE_TRANSIENT);
-		if (ret != SQLITE_OK) {
-			llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
-					sqlite3_errstr(ret) << " -> " <<
-					sqlite3_errmsg(sqlHolder) << "\n";
-			return;
-		}
-		ret = sqlite3_bind_text(insMem,
-					sqlite3_bind_parameter_index(insMem, ":struct"),
-					getRDName(RD).c_str(), -1,
-					SQLITE_TRANSIENT);
-		if (ret != SQLITE_OK) {
-			llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
-					sqlite3_errstr(ret) << " -> " <<
-					sqlite3_errmsg(sqlHolder) << "\n";
-			return;
-		}
-		ret = sqlite3_bind_text(insMem,
-					sqlite3_bind_parameter_index(insMem, ":src"),
-					src.c_str(), -1,
-					SQLITE_TRANSIENT);
-		if (ret != SQLITE_OK) {
-			llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
-					sqlite3_errstr(ret) << " -> " <<
-					sqlite3_errmsg(sqlHolder) << "\n";
-			return;
-		}
-		ret = sqlite3_bind_int(insMem,
-				       sqlite3_bind_parameter_index(insMem, ":strBegLine"),
-				       SM.getPresumedLineNumber(RDSR.getBegin()));
-		if (ret != SQLITE_OK) {
-			llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
-					sqlite3_errstr(ret) << " -> " <<
-					sqlite3_errmsg(sqlHolder) << "\n";
-			return;
-		}
-		ret = sqlite3_bind_int(insMem,
-				       sqlite3_bind_parameter_index(insMem, ":strBegCol"),
-				       SM.getPresumedColumnNumber(RDSR.getBegin()));
-		if (ret != SQLITE_OK) {
-			llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
-					sqlite3_errstr(ret) << " -> " <<
-					sqlite3_errmsg(sqlHolder) << "\n";
-			return;
-		}
-		ret = bindLoc(insMem, SR);
-		if (ret != SQLITE_OK) {
-			llvm::errs() << "db bind failed (" << __LINE__ << "): " <<
-					sqlite3_errstr(ret) << " -> " <<
-					sqlite3_errmsg(sqlHolder) << "\n";
-			return;
-		}
-		ret = sqlite3_step(insMem);
-		if (ret != SQLITE_DONE) {
-		    llvm::errs() << "db step failed (" << __LINE__ << "): " <<
-				    sqlite3_errstr(ret) << " -> " <<
-				    sqlite3_errmsg(sqlHolder) << "\n";
-		    return;
-		}
+		msg.renew(Message::KIND::MEMBER);
+		msg.add("name", getNDName(f));
+		msg.add("struct", RDName);
+		msg.add("src", src);
+		msg.add("strBegLine", SM.getPresumedLineNumber(RDSR.getBegin()));
+		msg.add("strBegCol", SM.getPresumedColumnNumber(RDSR.getBegin()));
+
+		bindLoc(msg, SR);
+		conn.write(msg);
 	}
 }
 
@@ -407,214 +280,14 @@ void MatchCallback::run(const MatchFinder::MatchResult &res)
 	}
 }
 
-static int busy_handler(void *data, int count)
-{
-	static const auto WAIT_INTVAL = std::chrono::milliseconds(20);
-	static const auto WAIT_TIMEOUT = std::chrono::minutes(20) / WAIT_INTVAL;
-
-	if (count >= WAIT_TIMEOUT)
-		return 0;
-
-	std::this_thread::sleep_for(WAIT_INTVAL);
-
-	return 1;
-}
-
-SQLHolder MyChecker::openDB() const
-{
-	sqlite3 *sql;
-	char *err;
-	int ret;
-
-	ret = sqlite3_open_v2("structs.db", &sql, SQLITE_OPEN_READWRITE |
-			      SQLITE_OPEN_CREATE, NULL);
-	SQLHolder sqlHolder(sql);
-	if (ret != SQLITE_OK) {
-		llvm::errs() << "db open failed: " << sqlite3_errstr(ret) << "\n";
-		return nullptr;
-	}
-
-	ret = sqlite3_exec(sqlHolder, "PRAGMA foreign_keys = ON;", NULL, NULL,
-			   &err);
-	if (ret != SQLITE_OK) {
-		llvm::errs() << "db PRAGMA failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " << err << "\n";
-		sqlite3_free(err);
-		return nullptr;
-	}
-
-	ret = sqlite3_busy_handler(sqlHolder, busy_handler, nullptr);
-	if (ret != SQLITE_OK) {
-		llvm::errs() << "db busy_handler failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " << err << "\n";
-		sqlite3_free(err);
-		return nullptr;
-	}
-
-	static const llvm::SmallVector<const char *> create_tables {
-		"source(id INTEGER PRIMARY KEY, "
-			"src TEXT NOT NULL UNIQUE)",
-		"struct(id INTEGER PRIMARY KEY, "
-			"name TEXT NOT NULL, "
-			"attrs TEXT, "
-			"src INTEGER NOT NULL REFERENCES source(id), "
-			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL, "
-			"endLine INTEGER, endCol INTEGER, "
-			"UNIQUE(name, src, begLine, begCol))",
-		"member(id INTEGER PRIMARY KEY, "
-			"name TEXT NOT NULL, "
-			"struct INTEGER NOT NULL REFERENCES struct(id), "
-			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL, "
-			"endLine INTEGER, endCol INTEGER, "
-			"UNIQUE(struct, name))",
-		"use(id INTEGER PRIMARY KEY, "
-			"member INTEGER NOT NULL REFERENCES member(id), "
-			"src INTEGER NOT NULL REFERENCES source(id), "
-			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL, "
-			"endLine INTEGER, endCol INTEGER, "
-			"load INTEGER, "
-			"UNIQUE(member, src, begLine))",
-	};
-
-	for (auto c: create_tables) {
-		std::string s("CREATE TABLE IF NOT EXISTS ");
-		s.append(c).append(" STRICT;");
-		ret = sqlite3_exec(sqlHolder, s.c_str(), NULL, NULL, &err);
-		if (ret != SQLITE_OK) {
-			llvm::errs() << "db CREATE failed (" << __LINE__ << "): " <<
-					sqlite3_errstr(ret) << " -> " <<
-					err << "\n\t" << s << "\n";
-			sqlite3_free(err);
-			return nullptr;
-		}
-	}
-
-	static const llvm::SmallVector<const char *> create_views {
-		"structs_view AS "
-			"SELECT struct.id, struct.name AS struct, struct.attrs, source.src, "
-				"struct.begLine || ':' || struct.begCol || '-' || "
-				"struct.endLine || ':' || struct.endCol AS location "
-			"FROM struct LEFT JOIN source ON struct.src=source.id",
-		"members_view AS "
-			"SELECT member.id, struct.name AS struct, "
-				"member.name AS member, source.src, "
-				"member.begLine || ':' || member.begCol || '-' || "
-				"member.endLine || ':' || member.endCol AS location "
-			"FROM member "
-			"LEFT JOIN struct ON member.struct=struct.id "
-			"LEFT JOIN source ON struct.src=source.id",
-		"use_view AS "
-			"SELECT use.id, struct.name AS struct, "
-				"member.name AS member, source.src, "
-				"use.begLine || ':' || use.begCol || '-' || "
-				"use.endLine || ':' || use.endCol AS location "
-			"FROM use "
-			"LEFT JOIN member ON use.member=member.id "
-			"LEFT JOIN struct ON member.struct=struct.id "
-			"LEFT JOIN source ON use.src=source.id",
-		"unused_view AS "
-			"SELECT struct.name AS struct, struct.attrs, member.name AS member, "
-				"source.src, "
-				"member.begLine || ':' || member.begCol || '-' || "
-				"member.endLine || ':' || member.endCol AS location "
-			"FROM member "
-			"LEFT JOIN struct ON member.struct=struct.id "
-			"LEFT JOIN source ON struct.src=source.id "
-			"WHERE member.id NOT IN (SELECT member FROM use) "
-				"AND struct.name != '<anonymous>' AND struct.name != '<unnamed>' "
-				"AND member.name != '<unnamed>'",
-	};
-
-	for (auto c: create_views) {
-		std::string s("CREATE VIEW IF NOT EXISTS ");
-		s.append(c);
-		ret = sqlite3_exec(sqlHolder, s.c_str(), NULL, NULL, &err);
-		if (ret != SQLITE_OK) {
-			llvm::errs() << "db CREATE failed (" << __LINE__ << "): " <<
-					sqlite3_errstr(ret) << " -> " <<
-					err << "\n\t" << s << "\n";
-			sqlite3_free(err);
-			return nullptr;
-		}
-	}
-
-	return sqlHolder;
-}
-
 void MyChecker::checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
 					  AnalysisManager &A,
 					  BugReporter &BR) const
 {
-	sqlite3_stmt *stmt;
-	char *err;
-	int ret;
+	Connection conn;
 
-	auto sqlHolder = openDB();
-
-	ret = sqlite3_prepare_v2(sqlHolder,
-				 "INSERT OR IGNORE INTO source(src) "
-				 "VALUES (:src);",
-				 -1, &stmt, NULL);
-	SQLStmtHolder insSrc(stmt);
-	if (ret != SQLITE_OK) {
-		llvm::errs() << "db prepare failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " <<
-				sqlite3_errmsg(sqlHolder) << "\n";
+	if (conn.open() < 0)
 		return;
-	}
-
-	ret = sqlite3_prepare_v2(sqlHolder,
-				 "INSERT OR IGNORE INTO "
-				 "struct(name, attrs, src, begLine, begCol, endLine, endCol) "
-				 "SELECT :name, :attrs, id, :begLine, :begCol, :endLine, :endCol "
-					"FROM source WHERE src=:src;",
-				 -1, &stmt, NULL);
-	SQLStmtHolder insStr(stmt);
-	if (ret != SQLITE_OK) {
-		llvm::errs() << "db prepare failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " <<
-				sqlite3_errmsg(sqlHolder) << "\n";
-		return;
-	}
-
-	ret = sqlite3_prepare_v2(sqlHolder,
-				 "INSERT OR IGNORE INTO "
-				 "member(name, struct, begLine, begCol, endLine, endCol) "
-				 "SELECT :name, struct.id, :begLine, :begCol, :endLine, :endCol "
-					"FROM struct LEFT JOIN source ON struct.src=source.id "
-					"WHERE source.src=:src AND "
-					"begLine=:strBegLine AND begCol=:strBegCol AND "
-					"name=:struct;",
-				 -1, &stmt, NULL);
-	SQLStmtHolder insMem(stmt);
-	if (ret != SQLITE_OK) {
-		llvm::errs() << "db prepare failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " <<
-				sqlite3_errmsg(sqlHolder) << "\n";
-		return;
-	}
-
-	ret = sqlite3_prepare_v2(sqlHolder,
-				 "INSERT OR IGNORE INTO "
-				 "use(member, src, begLine, begCol, endLine, endCol) "
-				 "SELECT (SELECT member.id FROM member "
-						"LEFT JOIN struct ON member.struct=struct.id "
-						"LEFT JOIN source ON struct.src=source.id "
-						"WHERE member.name=:member AND "
-						"struct.name=:struct AND "
-						"source.src=:strSrc AND "
-						"struct.begLine=:strLine AND "
-						"struct.begCol=:strCol), "
-					"(SELECT id FROM source WHERE src=:use_src), "
-					":begLine, :begCol, :endLine, :endCol;",
-				 -1, &stmt, NULL);
-	SQLStmtHolder insUse(stmt);
-	if (ret != SQLITE_OK) {
-		llvm::errs() << "db prepare failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " <<
-				sqlite3_errmsg(sqlHolder) << "\n";
-		return;
-	}
 
 	//TU->dumpColor();
 
@@ -622,30 +295,13 @@ void MyChecker::checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
 	std::filesystem::path basePath(basePathStr.str());
 
 	MatchFinder F;
-	MatchCallback CB(A.getSourceManager(), sqlHolder, insSrc, insStr,
-			 insMem, insUse, basePath);
+	MatchCallback CB(A.getSourceManager(), conn, basePath);
 	F.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, memberExpr().bind("ME")),
 		     &CB);
 	F.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, recordDecl(isStruct()).bind("RD")),
 		     &CB);
 
-	ret = sqlite3_exec(sqlHolder, "BEGIN;", NULL, NULL, &err);
-	if (ret != SQLITE_OK) {
-		llvm::errs() << "db BEGIN failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " << err << "\n";
-		sqlite3_free(err);
-		return;
-	}
-
 	F.matchAST(A.getASTContext());
-
-	ret = sqlite3_exec(sqlHolder, "END;", NULL, NULL, &err);
-	if (ret != SQLITE_OK) {
-		llvm::errs() << "db END failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " << err << "\n";
-		sqlite3_free(err);
-		return;
-	}
 }
 
 extern "C" void clang_registerCheckers(CheckerRegistry &registry) {

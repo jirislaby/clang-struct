@@ -61,7 +61,11 @@ sub stop() {
 $SIG{'INT'} = \&stop;
 $SIG{'TERM'} = \&stop;
 
-my $period = time();
+my $daemon = fork();
+if (!$daemon) {
+	exec('db_filler');
+	die;
+}
 
 foreach my $entry (@{$json}) {
 	last if $stop;
@@ -72,13 +76,6 @@ foreach my $entry (@{$json}) {
 	if ($skip_files{$file}) {
 		print "$file skipped\n";
 		next;
-	}
-
-	# we need to flush sqlite busy waiters before they time out
-	if (time() - $period > 15 * 60) {
-		$period = time();
-		print STDERR "Flushing to the database, hold on\n";
-		$pm->wait_all_children;
 	}
 
 	print "$file\n";
@@ -103,5 +100,8 @@ foreach my $entry (@{$json}) {
 print STDERR "Done, waiting for ", scalar $pm->running_procs, " children\n";
 
 $pm->wait_all_children;
+
+kill 'TERM', $daemon;
+wait;
 
 1;
