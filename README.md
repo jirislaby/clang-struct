@@ -39,6 +39,7 @@ Also a web frontend exists in `frontend/`. It's written in [Ruby on Rails](https
 ```sh
 bundle install
 bundle exec rails credentials:edit
+bundle exec rake assets:precompile
 bundle exec rails server -e production
 ```
 
