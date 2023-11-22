@@ -673,7 +673,7 @@ void sig(int sig)
 	stop = true;
 	server.close();
 	if (sig == SIGABRT)
-		exit(1);
+		_exit(EXIT_FAILURE);
 }
 
 int main()
