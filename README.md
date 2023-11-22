@@ -1,4 +1,4 @@
-# clang-struct – Indexed structures of the kernel
+# clang-struct – Indexed Structures of the Kernel
 
 *clang-struct* is a [clang](https://clang.llvm.org/) plugin which indexes structures, its members, and uses into a [sqlite3](https://www.sqlite.org/) database. *clang-struct* is primarily aimed, but not limited, to index the [Linux kernel](https://www.kernel.org/). When the code is indexed, it is easy to find unused members of structures or even whole structures.
 
