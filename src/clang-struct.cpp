@@ -19,6 +19,7 @@
 using namespace clang;
 using namespace clang::ast_matchers;
 using namespace clang::ento;
+using Msg = Message<std::string>;
 
 class Connection {
 public:
@@ -26,7 +27,7 @@ public:
 	~Connection();
 
 	int open();
-	void write(const Message &msg);
+	void write(const Msg &msg);
 private:
 #if 0
 	int sock = -1;
@@ -51,7 +52,7 @@ public:
 
 	void run(const MatchFinder::MatchResult &res);
 private:
-	void bindLoc(Message &msg, const SourceRange &SR);
+	void bindLoc(Msg &msg, const SourceRange &SR);
 	std::string getSrc(const SourceLocation &SLOC);
 
 	void handleUse(const MemberExpr *ME, const RecordType *ST);
@@ -110,7 +111,7 @@ int Connection::open()
 	return 0;
 }
 
-void Connection::write(const Message &msg)
+void Connection::write(const Msg &msg)
 {
 #if 0
 	auto ret = ::write(sock, msg.c_str(), msg.length());
@@ -133,7 +134,7 @@ void Connection::write(const Message &msg)
 #endif
 }
 
-void MatchCallback::bindLoc(Message &msg, const SourceRange &SR)
+void MatchCallback::bindLoc(Msg &msg, const SourceRange &SR)
 {
 	msg.add("begLine", SM.getPresumedLineNumber(SR.getBegin()));
 	msg.add("begCol", SM.getPresumedColumnNumber(SR.getBegin()));
@@ -158,12 +159,12 @@ void MatchCallback::handleUse(const MemberExpr *ME, const RecordType *ST)
 	auto strLoc = ST->getDecl()->getBeginLoc();
 	auto strSrc = getSrc(strLoc);
 	auto useSrc = getSrc(ME->getBeginLoc());
-	Message msg(Message::KIND::SOURCE);
+	Msg msg(Msg::KIND::SOURCE);
 
 	msg.add("src", useSrc);
 	conn.write(msg);
 
-	msg.renew(Message::KIND::USE);
+	msg.renew(Msg::KIND::USE);
 	msg.add("member", getNDName(ME->getMemberDecl()));
 	msg.add("struct", getRDName(ST->getDecl()));
 	msg.add("strSrc", strSrc);
@@ -222,12 +223,12 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 	auto RDSR = RD->getSourceRange();
 	auto RDName = getRDName(RD);
 	auto src = getSrc(RDSR.getBegin());
-	Message msg(Message::KIND::SOURCE);
+	Msg msg(Msg::KIND::SOURCE);
 
 	msg.add("src", src);
 	conn.write(msg);
 
-	msg.renew(Message::KIND::STRUCT);
+	msg.renew(Msg::KIND::STRUCT);
 	msg.add("name", RDName);
 
 	std::stringstream ss;
@@ -257,7 +258,7 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 		/*llvm::errs() << __func__ << ": " << RD->getNameAsString() <<
 				"." << f->getNameAsString() << "\n";*/
 		auto SR = f->getSourceRange();
-		msg.renew(Message::KIND::MEMBER);
+		msg.renew(Msg::KIND::MEMBER);
 		msg.add("name", getNDName(f));
 		msg.add("struct", RDName);
 		msg.add("src", src);

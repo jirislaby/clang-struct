@@ -20,6 +20,8 @@
 #include "sqlite.h"
 #include "Message.h"
 
+using Msg = Message<std::string_view>;
+
 volatile std::sig_atomic_t stop;
 
 class Server {
@@ -30,7 +32,7 @@ public:
 	int open();
 	void close();
 
-	std::string read();
+	std::string_view read();
 private:
 #if 0
 	int sock = -1;
@@ -50,7 +52,7 @@ Server::~Server()
 	close();
 }
 
-std::string Server::read()
+std::string_view Server::read()
 {
 	auto rd = mq_receive(mq, buf.get(), buf_len, NULL);
 	if (rd < 0) {
@@ -59,7 +61,7 @@ std::string Server::read()
 		return "";
 	}
 
-	return std::string(buf.get(), rd);
+	return std::string_view(buf.get(), rd);
 }
 
 void Server::close()
@@ -358,9 +360,9 @@ public:
 	int begin();
 	int end();
 
-	int handleMessage(const Message &msg);
+	int handleMessage(const Msg &msg);
 private:
-	int bindAndStep(SQLStmtHolder &ins, const Message &msg);
+	int bindAndStep(SQLStmtHolder &ins, const Msg &msg);
 
 	SQLHolder sqlHolder;
 	SQLStmtHolder insSrc;
@@ -592,7 +594,7 @@ int SQLConn::end()
 	return 0;
 }
 
-int SQLConn::bindAndStep(SQLStmtHolder &ins, const Message &msg)
+int SQLConn::bindAndStep(SQLStmtHolder &ins, const Msg &msg)
 {
 	SQLStmtResetter insSrcResetter(sqlHolder, ins);
 	int ret;
@@ -600,18 +602,21 @@ int SQLConn::bindAndStep(SQLStmtHolder &ins, const Message &msg)
 	for (auto e: msg) {
 		const auto [type, key, val] = e;
 
-		auto bindIdx = sqlite3_bind_parameter_index(ins, (":" + key).c_str());
+		std::string bind(":");
+		bind.append(key);
+		auto bindIdx = sqlite3_bind_parameter_index(ins, bind.c_str());
 		if (!bindIdx) {
 			std::cerr << "no index found for key=" << key << "\n";
 			std::cerr << "\t" << msg << "\n";
 			return -1;
 		}
 
-		if (type == Message::TYPE::TEXT) {
-			ret = sqlite3_bind_text(ins, bindIdx, val.c_str(), -1, SQLITE_TRANSIENT);
-		} else if (type == Message::TYPE::INT) {
+		if (type == Msg::TYPE::TEXT) {
+			ret = sqlite3_bind_text(ins, bindIdx, val.data(), -1, SQLITE_TRANSIENT);
+		} else if (type == Msg::TYPE::INT) {
 			try {
-				ret = sqlite3_bind_int(ins, bindIdx, std::stoi(val));
+				auto i = std::stoi(std::string(val));
+				ret = sqlite3_bind_int(ins, bindIdx, i);
 			} catch (std::invalid_argument const& ex) {
 				std::cerr << "bad int val=\"" << val << "\"\n";
 				return -1;
@@ -642,17 +647,17 @@ int SQLConn::bindAndStep(SQLStmtHolder &ins, const Message &msg)
 	return 0;
 }
 
-int SQLConn::handleMessage(const Message &msg)
+int SQLConn::handleMessage(const Msg &msg)
 {
 	auto kind = msg.getKind();
 
-	if (kind == Message::KIND::SOURCE)
+	if (kind == Msg::KIND::SOURCE)
 		return bindAndStep(insSrc, msg);
-	if (kind == Message::KIND::STRUCT)
+	if (kind == Msg::KIND::STRUCT)
 		return bindAndStep(insStr, msg);
-	if (kind == Message::KIND::MEMBER)
+	if (kind == Msg::KIND::MEMBER)
 		return bindAndStep(insMem, msg);
-	if (kind == Message::KIND::USE)
+	if (kind == Msg::KIND::USE)
 		return bindAndStep(insUse, msg);
 
 	std::cerr << "bad message kind: " << kind << "\n";
@@ -692,7 +697,7 @@ int main()
 		if (stop || msgStr.empty())
 			break;
 
-		auto msg = Message::deserialize(msgStr);
+		auto msg = Msg::deserialize(msgStr);
 
 		//std::cerr << "===" << msg << "\n";
 

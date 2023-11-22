@@ -1,13 +1,16 @@
 #ifndef MESSAGE_H
 #define MESSAGE_H
 
+#include <cassert>
 #include <cstdint>
+#include <cstring>
 #include <ostream>
 #include <string>
 #include <sstream>
 #include <tuple>
 #include <vector>
 
+template<typename T>
 class Message {
 public:
 	enum TYPE {
@@ -20,21 +23,21 @@ public:
 		MEMBER = 'M',
 		USE = 'U',
 	};
-	using entry = std::tuple<TYPE, std::string, std::string>;
+	using entry = std::tuple<TYPE, const T, const T>;
 	using storage = std::vector<entry>;
 
 	Message(const KIND &kind) : kind(kind) {}
 
-	void add(const TYPE &type, const std::string &key, const std::string &val) {
+	void add(const TYPE &type, const T &key, const T &val) {
 		entries.push_back(std::make_tuple(type, key, val));
 	}
 
-	void add(const std::string &key, const std::string &val) {
+	void add(const T &key, const T &val) {
 		add(TEXT, key, val);
 	}
 
-	template<typename T>
-	void add(const std::string &key, T val) {
+	template<typename U>
+	void add(const T &key, U val) {
 		add(INT, key, std::to_string(val));
 	}
 
@@ -46,42 +49,42 @@ public:
 	KIND getKind() const { return kind; }
 	size_t size() const { return entries.size(); }
 	entry operator[](int idx) const { return entries[idx]; }
-	storage::const_iterator begin() const { return entries.begin(); }
-	storage::const_iterator end() const { return entries.end(); }
+	typename storage::const_iterator begin() const { return entries.begin(); }
+	typename storage::const_iterator end() const { return entries.end(); }
 
 	std::string serialize() const;
-	static Message deserialize(const std::string &str);
+	static Message deserialize(const std::string_view &str);
 private:
 	Message() {}
 
 	void setKind(const KIND &kind) { this->kind = kind; }
 
 	static void serializeString(std::stringstream &ss, const std::string &str);
-	static std::string deserializeString(std::istringstream &ss);
+	static std::string_view deserializeString(std::string_view &str);
 
 	KIND kind;
 	storage entries;
 };
 
-inline void Message::serializeString(std::stringstream &ss, const std::string &str)
+template<typename T> inline void Message<T>::serializeString(std::stringstream &ss, const std::string &str)
 {
 	uint16_t sz = str.length();
 	ss.write((char *)&sz, sizeof(sz));
 	ss << str;
 }
 
-inline std::string Message::deserializeString(std::istringstream &ss)
+template<typename T> inline std::string_view Message<T>::deserializeString(std::string_view &str)
 {
-	uint16_t sz;
-	ss.read((char *)&sz, sizeof(sz));
+	using slen = uint16_t;
+	assert(str.length() > sizeof(slen));
 
-	char buf[sz];
-	ss.read(buf, sz);
-
-	return std::string(buf, sz);
+	auto len = *(slen *)str.data();
+	auto ret = str.substr(sizeof(slen), len);
+	str = str.substr(sizeof(slen) + len);
+	return ret;
 }
 
-inline std::string Message::serialize() const
+template<typename T> inline std::string Message<T>::serialize() const
 {
 	std::stringstream ss;
 
@@ -98,19 +101,19 @@ inline std::string Message::serialize() const
 	return ss.str();
 }
 
-inline Message Message::deserialize(const std::string &str)
+template<typename T> inline Message<T> Message<T>::deserialize(const std::string_view &str)
 {
-	std::istringstream iss(str);
-	std::string item;
-	Message msg((KIND)iss.get());
+	Message msg((KIND)str[0]);
+	auto cur = str.substr(1);
 
-	while (true) {
-		auto type = iss.get();
+	while (cur.length()) {
+		auto type = cur[0];
 		if (type == EOF)
 			break;
 
-		auto key = deserializeString(iss);
-		auto val = deserializeString(iss);
+		cur = cur.substr(1);
+		auto key = deserializeString(cur);
+		auto val = deserializeString(cur);
 
 		msg.add((TYPE)type, key, val);
 	}
@@ -118,7 +121,7 @@ inline Message Message::deserialize(const std::string &str)
 	return msg;
 }
 
-inline std::ostream& operator<<(std::ostream &os, const Message &msg)
+template<typename T> inline std::ostream& operator<<(std::ostream &os, const Message<T> &msg)
 {
 	os.put(msg.getKind());
 
