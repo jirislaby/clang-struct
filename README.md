@@ -43,3 +43,4 @@ bundle exec rake assets:precompile
 bundle exec rails server -e production
 ```
 
+Note that `libyaml-devel` and `ruby-devel` packages are likely needed for install to succeed.
