@@ -7,8 +7,9 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <getopt.h>
 #include <mqueue.h>
-//#include <unistd.h>
+#include <unistd.h>
 
 //#include <sys/socket.h>
 //#include <sys/un.h>
@@ -676,11 +677,36 @@ void sig(int sig)
 		_exit(EXIT_FAILURE);
 }
 
-int main()
+static void usage(const char *exe, const struct option longopts[])
+{
+	std::cerr << "Options of " << exe << "\n";
+	for (auto &opt = longopts; opt->name; opt++)
+		std::cerr << "\t" << opt->name << "\n";
+}
+
+int main(int argc, char **argv)
 {
 	signal(SIGABRT, sig);
 	signal(SIGINT, sig);
 	signal(SIGTERM, sig);
+
+	static const struct option longopts[] = {
+		{ "autocommit", 0, NULL, 'a' },
+		{}
+	};
+	bool autocommit = false;
+	int opt;
+
+	while ((opt = getopt_long(argc, argv, "a", longopts, NULL)) != -1) {
+		switch (opt) {
+		case 'a':
+			autocommit = true;
+			break;
+		default:
+			usage(argv[0], longopts);
+			return EXIT_FAILURE;
+		}
+	}
 
 	if (server.open() < 0)
 		return EXIT_FAILURE;
@@ -689,7 +715,7 @@ int main()
 		return EXIT_FAILURE;
 	if (sqlConn.prepDB() < 0)
 		return EXIT_FAILURE;
-	if (sqlConn.begin() < 0)
+	if (!autocommit && sqlConn.begin() < 0)
 		return EXIT_FAILURE;
 
 	while (true) {
@@ -704,9 +730,11 @@ int main()
 		sqlConn.handleMessage(msg);
 	}
 
-	std::cerr << "commiting\n";
-	if (sqlConn.end() < 0)
-		return EXIT_FAILURE;
+	if (!autocommit) {
+		std::cerr << "commiting\n";
+		if (sqlConn.end() < 0)
+			return EXIT_FAILURE;
+	}
 	std::cerr << "bye\n";
 
 	return 0;
