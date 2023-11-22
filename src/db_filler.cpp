@@ -33,6 +33,8 @@ public:
 	int open();
 	void close();
 
+	static void unlink();
+
 	std::string_view read();
 private:
 #if 0
@@ -79,6 +81,11 @@ void Server::close()
 		mq = -1;
 	}
 #endif
+}
+
+void Server::unlink()
+{
+	mq_unlink(queue_name);
 }
 
 int Server::open()
@@ -692,15 +699,19 @@ int main(int argc, char **argv)
 
 	static const struct option longopts[] = {
 		{ "autocommit", 0, NULL, 'a' },
+		{ "unlink", 0, NULL, 'u' },
 		{}
 	};
 	bool autocommit = false;
 	int opt;
 
-	while ((opt = getopt_long(argc, argv, "a", longopts, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "au", longopts, NULL)) != -1) {
 		switch (opt) {
 		case 'a':
 			autocommit = true;
+			break;
+		case 'u':
+			server.unlink();
 			break;
 		default:
 			usage(argv[0], longopts);
