@@ -18,6 +18,7 @@ public:
 		TEXT = 't',
 	};
 	enum KIND {
+		INVALID = -1,
 		SOURCE = 'S',
 		STRUCT = 'T',
 		MEMBER = 'M',
@@ -26,7 +27,8 @@ public:
 	using entry = std::tuple<TYPE, const T, const T>;
 	using storage = std::vector<entry>;
 
-	Message(const KIND &kind) : kind(kind) {}
+	Message() : Message(KIND::INVALID) { }
+	Message(const KIND &kind) : kind(kind) { entries.reserve(10); }
 
 	void add(const TYPE &type, const T &key, const T &val) {
 		entries.push_back(std::make_tuple(type, key, val));
@@ -53,9 +55,8 @@ public:
 	typename storage::const_iterator end() const { return entries.end(); }
 
 	std::string serialize() const;
-	static Message deserialize(const std::string_view &str);
+	void deserialize(const std::string_view &str);
 private:
-	Message() {}
 
 	void setKind(const KIND &kind) { this->kind = kind; }
 
@@ -101,9 +102,9 @@ template<typename T> inline std::string Message<T>::serialize() const
 	return ss.str();
 }
 
-template<typename T> inline Message<T> Message<T>::deserialize(const std::string_view &str)
+template<typename T> inline void Message<T>::deserialize(const std::string_view &str)
 {
-	Message msg((KIND)str[0]);
+	renew((KIND)str[0]);
 	auto cur = str.substr(1);
 
 	while (cur.length()) {
@@ -115,10 +116,8 @@ template<typename T> inline Message<T> Message<T>::deserialize(const std::string
 		auto key = deserializeString(cur);
 		auto val = deserializeString(cur);
 
-		msg.add((TYPE)type, key, val);
+		add((TYPE)type, key, val);
 	}
-
-	return msg;
 }
 
 template<typename T> inline std::ostream& operator<<(std::ostream &os, const Message<T> &msg)

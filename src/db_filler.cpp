@@ -548,12 +548,14 @@ int main(int argc, char **argv)
 	if (!autocommit && sqlConn.begin() < 0)
 		return EXIT_FAILURE;
 
+	Msg msg;
+
 	while (true) {
 		auto msgStr = server.read();
 		if (stop || msgStr.empty())
 			break;
 
-		auto msg = Msg::deserialize(msgStr);
+		msg.deserialize(msgStr);
 
 		//std::cerr << "===" << msg << "\n";
 
