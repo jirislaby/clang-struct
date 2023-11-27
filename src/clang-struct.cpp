@@ -55,9 +55,13 @@ private:
 	void bindLoc(Msg &msg, const SourceRange &SR);
 	std::string getSrc(const SourceLocation &SLOC);
 
-	void handleUse(const MemberExpr *ME, const RecordType *ST);
+	void handleUse(const SourceRange &initSR, const NamedDecl *ND, const RecordType *ST);
+	void handleUse(const MemberExpr *ME, const RecordType *ST) {
+		handleUse(ME->getSourceRange(), ME->getMemberDecl(), ST);
+	}
 	void handleME(const MemberExpr *ME);
 	void handleRD(const RecordDecl *RD);
+	void handleILE(const InitListExpr *ILE);
 
 	static std::string getNDName(const NamedDecl *ND);
 	static std::string getRDName(const RecordDecl *RD);
@@ -154,25 +158,25 @@ std::string MatchCallback::getSrc(const SourceLocation &SLOC)
 	return ret.string();
 }
 
-void MatchCallback::handleUse(const MemberExpr *ME, const RecordType *ST)
+void MatchCallback::handleUse(const SourceRange &initSR, const NamedDecl *ND, const RecordType *ST)
 {
 	auto strLoc = ST->getDecl()->getBeginLoc();
 	auto strSrc = getSrc(strLoc);
-	auto useSrc = getSrc(ME->getBeginLoc());
+	auto useSrc = getSrc(initSR.getBegin());
 	Msg msg(Msg::KIND::SOURCE);
 
 	msg.add("src", useSrc);
 	conn.write(msg);
 
 	msg.renew(Msg::KIND::USE);
-	msg.add("member", getNDName(ME->getMemberDecl()));
+	msg.add("member", getNDName(ND));
 	msg.add("struct", getRDName(ST->getDecl()));
 	msg.add("strSrc", strSrc);
 	msg.add("strLine", SM.getPresumedLineNumber(strLoc));
 	msg.add("strCol", SM.getPresumedColumnNumber(strLoc));
 	msg.add("use_src", useSrc);
 
-	bindLoc(msg, ME->getSourceRange());
+	bindLoc(msg, initSR);
 
 	conn.write(msg);
 }
@@ -193,6 +197,7 @@ void MatchCallback::handleME(const MemberExpr *ME)
 		// TODO: anonymous member struct
 		//RD->dumpColor();
 	} else {
+		llvm::errs() << __PRETTY_FUNCTION__ << ": unhandled type\n";
 		ME->getSourceRange().dump(SM);
 		ME->dumpColor();
 		T->dump();
@@ -270,6 +275,51 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 	}
 }
 
+void MatchCallback::handleILE(const InitListExpr *ILE)
+{
+	auto T = ILE->getType().getCanonicalType();
+	if (auto RT = T->getAsStructureType()) {
+		auto RD = RT->getDecl();
+		//RD->dumpColor();
+		for (auto field: RD->fields()) {
+			SourceRange SR;
+			auto idx = field->getFieldIndex();
+			if (idx < ILE->getNumInits()) {
+				auto init = ILE->getInit(idx);
+				if (!init) {
+					llvm::errs() << "null initializer for " <<
+							field->getFieldIndex() << "\n";
+					field->dumpColor();
+					RD->dumpColor();
+					ILE->dumpColor();
+					abort();
+				}
+
+				SR = init->getSourceRange();
+
+				/*llvm::errs() << "field " << field->getFieldIndex() << "\n";
+				field->dumpColor();
+				llvm::errs() << "init\n";
+				init->dumpColor();
+				SR.dump(SM);*/
+			}
+			// implicit initializers has invalid SR
+			if (!SR.isValid())
+				SR = ILE->getSourceRange();
+
+			handleUse(SR, field, RT);
+		}
+	} else if (T->isUnionType()) {
+	} else if (!T->isConstantArrayType() && !llvm::isa<TypeOfType>(T) &&
+		   !llvm::isa<BuiltinType>(T) && !llvm::isa<PointerType>(T)) {
+		llvm::errs() << __PRETTY_FUNCTION__ << ": unhandled type\n";
+		ILE->getSourceRange().dump(SM);
+		ILE->dumpColor();
+		T->dump();
+		abort();
+	}
+}
+
 void MatchCallback::run(const MatchFinder::MatchResult &res)
 {
 	if (auto ME = res.Nodes.getNodeAs<MemberExpr>("ME")) {
@@ -278,6 +328,9 @@ void MatchCallback::run(const MatchFinder::MatchResult &res)
 	if (auto RD = res.Nodes.getNodeAs<RecordDecl>("RD")) {
 		if (RD->isThisDeclarationADefinition())
 			handleRD(RD);
+	}
+	if (auto ILE = res.Nodes.getNodeAs<InitListExpr>("ILE")) {
+		handleILE(ILE);
 	}
 }
 
@@ -300,6 +353,8 @@ void MyChecker::checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
 	F.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, memberExpr().bind("ME")),
 		     &CB);
 	F.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, recordDecl(isStruct()).bind("RD")),
+		     &CB);
+	F.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, initListExpr().bind("ILE")),
 		     &CB);
 
 	F.matchAST(A.getASTContext());
