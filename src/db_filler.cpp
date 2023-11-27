@@ -439,7 +439,7 @@ int SQLConn::bindAndStep(SQLStmtHolder &ins, const Msg &msg)
 		}
 
 		if (type == Msg::TYPE::TEXT) {
-			ret = sqlite3_bind_text(ins, bindIdx, val.data(), -1, SQLITE_TRANSIENT);
+			ret = sqlite3_bind_text(ins, bindIdx, val.data(), val.length(), SQLITE_TRANSIENT);
 		} else if (type == Msg::TYPE::INT) {
 			try {
 				auto i = std::stoi(std::string(val));
