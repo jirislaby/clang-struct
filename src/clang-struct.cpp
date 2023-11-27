@@ -55,9 +55,9 @@ private:
 	void bindLoc(Msg &msg, const SourceRange &SR);
 	std::string getSrc(const SourceLocation &SLOC);
 
-	void handleUse(const SourceRange &initSR, const NamedDecl *ND, const RecordType *ST);
+	void handleUse(const SourceRange &initSR, const NamedDecl *ND, const RecordType *ST, int load);
 	void handleUse(const MemberExpr *ME, const RecordType *ST) {
-		handleUse(ME->getSourceRange(), ME->getMemberDecl(), ST);
+		handleUse(ME->getSourceRange(), ME->getMemberDecl(), ST, -1);
 	}
 	void handleME(const MemberExpr *ME);
 	void handleRD(const RecordDecl *RD);
@@ -158,7 +158,8 @@ std::string MatchCallback::getSrc(const SourceLocation &SLOC)
 	return ret.string();
 }
 
-void MatchCallback::handleUse(const SourceRange &initSR, const NamedDecl *ND, const RecordType *ST)
+void MatchCallback::handleUse(const SourceRange &initSR, const NamedDecl *ND, const RecordType *ST,
+			      int load)
 {
 	auto strLoc = ST->getDecl()->getBeginLoc();
 	auto strSrc = getSrc(strLoc);
@@ -175,6 +176,10 @@ void MatchCallback::handleUse(const SourceRange &initSR, const NamedDecl *ND, co
 	msg.add("strLine", SM.getPresumedLineNumber(strLoc));
 	msg.add("strCol", SM.getPresumedColumnNumber(strLoc));
 	msg.add("use_src", useSrc);
+	if (load < 0)
+		msg.add("load");
+	else
+		msg.add("load", load);
 
 	bindLoc(msg, initSR);
 
@@ -307,7 +312,7 @@ void MatchCallback::handleILE(const InitListExpr *ILE)
 			if (!SR.isValid())
 				SR = ILE->getSourceRange();
 
-			handleUse(SR, field, RT);
+			handleUse(SR, field, RT, 0);
 		}
 	} else if (T->isUnionType()) {
 	} else if (!T->isConstantArrayType() && !llvm::isa<TypeOfType>(T) &&

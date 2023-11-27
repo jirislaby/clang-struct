@@ -15,6 +15,7 @@ class Message {
 public:
 	enum TYPE {
 		INT = 'i',
+		NUL = 'n',
 		TEXT = 't',
 	};
 	enum KIND {
@@ -36,6 +37,10 @@ public:
 
 	void add(const T &key, const T &val) {
 		add(TEXT, key, val);
+	}
+
+	void add(const T &key) {
+		add(NUL, key, "");
 	}
 
 	template<typename U>

@@ -292,7 +292,7 @@ int SQLConn::openDB()
 			"SELECT use.id, struct.name AS struct, "
 				"member.name AS member, source.src, "
 				"use.begLine || ':' || use.begCol || '-' || "
-				"use.endLine || ':' || use.endCol AS location "
+				"use.endLine || ':' || use.endCol AS location, load "
 			"FROM use "
 			"LEFT JOIN member ON use.member=member.id "
 			"LEFT JOIN struct ON member.struct=struct.id "
@@ -377,7 +377,7 @@ int SQLConn::prepDB()
 
 	ret = sqlite3_prepare_v2(sqlHolder,
 				 "INSERT OR IGNORE INTO "
-				 "use(member, src, begLine, begCol, endLine, endCol) "
+				 "use(member, src, begLine, begCol, endLine, endCol, load) "
 				 "SELECT (SELECT member.id FROM member "
 						"LEFT JOIN struct ON member.struct=struct.id "
 						"LEFT JOIN source ON struct.src=source.id "
@@ -387,7 +387,7 @@ int SQLConn::prepDB()
 						"struct.begLine=:strLine AND "
 						"struct.begCol=:strCol), "
 					"(SELECT id FROM source WHERE src=:use_src), "
-					":begLine, :begCol, :endLine, :endCol;",
+					":begLine, :begCol, :endLine, :endCol, :load;",
 				 -1, &stmt, NULL);
 	insUse.reset(stmt);
 	if (ret != SQLITE_OK) {
@@ -455,6 +455,8 @@ int SQLConn::bindAndStep(SQLStmtHolder &ins, const Msg &msg)
 				std::cerr << "bad int val=\"" << val << "\"\n";
 				return -1;
 			}
+		} else if (type == Msg::TYPE::NUL) {
+			ret = sqlite3_bind_null(ins, bindIdx);
 		} else {
 			std::cerr << "bad type: " << msg << "\n";
 			abort();
