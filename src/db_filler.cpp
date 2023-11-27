@@ -3,12 +3,14 @@
 #include <cstring>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <thread>
 
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
 #include <mqueue.h>
+#include <time.h>
 #include <unistd.h>
 
 //#include <sys/socket.h>
@@ -35,7 +37,7 @@ public:
 
 	static void unlink();
 
-	std::string_view read();
+	std::optional<std::string_view> read();
 private:
 #if 0
 	int sock = -1;
@@ -55,13 +57,18 @@ Server::~Server()
 	close();
 }
 
-std::string_view Server::read()
+std::optional<std::string_view> Server::read()
 {
-	auto rd = mq_receive(mq, buf.get(), buf_len, NULL);
+	struct timespec timeout = {
+		.tv_sec = time(NULL) + 5,
+	};
+	auto rd = mq_timedreceive(mq, buf.get(), buf_len, NULL, &timeout);
 	if (rd < 0) {
+		if (errno == ETIMEDOUT)
+			return "";
 		if (!stop)
 			std::cerr << "cannot read: " << strerror(errno) << "\n";
-		return "";
+		return std::nullopt;
 	}
 
 	return std::string_view(buf.get(), rd);
@@ -549,17 +556,29 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 
 	Msg msg;
+	bool should_commit = false;
 
 	while (true) {
 		auto msgStr = server.read();
-		if (stop || msgStr.empty())
+		if (stop || !msgStr)
 			break;
 
-		msg.deserialize(msgStr);
+		if (msgStr->empty()) {
+			if (should_commit) {
+				std::cerr << "commiting\n";
+				if (sqlConn.end() < 0 || sqlConn.begin() < 0)
+					return EXIT_FAILURE;
+				should_commit = false;
+			}
+			continue;
+		}
+
+		msg.deserialize(*msgStr);
 
 		//std::cerr << "===" << msg << "\n";
 
 		sqlConn.handleMessage(msg);
+		should_commit = !autocommit;
 	}
 
 	if (!autocommit) {
