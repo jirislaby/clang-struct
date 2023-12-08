@@ -55,9 +55,10 @@ private:
 	void bindLoc(Msg &msg, const SourceRange &SR);
 	std::string getSrc(const SourceLocation &SLOC);
 
-	void handleUse(const SourceRange &initSR, const NamedDecl *ND, const RecordType *ST, int load);
+	void handleUse(const SourceRange &initSR, const NamedDecl *ND, const RecordType *ST,
+		       int load, bool implicit);
 	void handleUse(const MemberExpr *ME, const RecordType *ST) {
-		handleUse(ME->getSourceRange(), ME->getMemberDecl(), ST, -1);
+		handleUse(ME->getSourceRange(), ME->getMemberDecl(), ST, -1, false);
 	}
 	void handleME(const MemberExpr *ME);
 	void handleRD(const RecordDecl *RD);
@@ -159,7 +160,7 @@ std::string MatchCallback::getSrc(const SourceLocation &SLOC)
 }
 
 void MatchCallback::handleUse(const SourceRange &initSR, const NamedDecl *ND, const RecordType *ST,
-			      int load)
+			      int load, bool implicit)
 {
 	auto strLoc = ST->getDecl()->getBeginLoc();
 	auto strSrc = getSrc(strLoc);
@@ -180,6 +181,7 @@ void MatchCallback::handleUse(const SourceRange &initSR, const NamedDecl *ND, co
 		msg.add("load");
 	else
 		msg.add("load", load);
+	msg.add("implicit", implicit);
 
 	bindLoc(msg, initSR);
 
@@ -288,6 +290,7 @@ void MatchCallback::handleILE(const InitListExpr *ILE)
 		//RD->dumpColor();
 		for (auto field: RD->fields()) {
 			SourceRange SR;
+			bool implicit = true;
 			auto idx = field->getFieldIndex();
 			if (idx < ILE->getNumInits()) {
 				auto init = ILE->getInit(idx);
@@ -301,6 +304,7 @@ void MatchCallback::handleILE(const InitListExpr *ILE)
 				}
 
 				SR = init->getSourceRange();
+				implicit = llvm::isa<ImplicitValueInitExpr>(init);
 
 				/*llvm::errs() << "field " << field->getFieldIndex() << "\n";
 				field->dumpColor();
@@ -312,7 +316,7 @@ void MatchCallback::handleILE(const InitListExpr *ILE)
 			if (!SR.isValid())
 				SR = ILE->getSourceRange();
 
-			handleUse(SR, field, RT, 0);
+			handleUse(SR, field, RT, 0, implicit);
 		}
 	} else if (T->isUnionType()) {
 	} else if (!T->isConstantArrayType() && !llvm::isa<TypeOfType>(T) &&
