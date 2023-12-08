@@ -71,10 +71,12 @@ if (!$daemon) {
 
 my $period = time();
 my $counter = 0;
+my $remaining = scalar @{$json};
 
 foreach my $entry (@{$json}) {
 	last if $stop;
 
+	$remaining--;
 	my $file = $entry->{'file'};
 	next unless ($file =~ /\.c$/);
 	next if (defined $filter && $file !~ $filter);
@@ -85,11 +87,12 @@ foreach my $entry (@{$json}) {
 
 	$counter++;
 	if ($silent == 0) {
-		print "$counter $file\n";
+		print "$counter|$remaining $file\n";
 	} elsif ($silent == 1) {
 		if (time() - $period > 60) {
 			$period = time();
-			print STDERR "Processed $counter files in a minute.\n";
+			print STDERR "Processed $counter files in a minute. $remaining remaining.\n";
+
 			$counter = 0;
 		}
 	}
