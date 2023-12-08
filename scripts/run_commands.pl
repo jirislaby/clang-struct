@@ -11,11 +11,13 @@ use Parallel::ForkManager;
 my $basepath = "";
 my $dbfile = 'structs.db';
 my $filter;
+my $silent = 0;
 my $skip = '';
 my $verbose = 0;
 GetOptions(
 	"basepath=s"	=> \$basepath,
 	"filter=s"	=> \$filter,
+	"silent+"	=> \$silent,
 	"skip"		=> \$skip,
 	"verbose+"	=> \$verbose)
 or die("Error in command line arguments\n");
@@ -67,6 +69,9 @@ if (!$daemon) {
 	die;
 }
 
+my $period = time();
+my $counter = 0;
+
 foreach my $entry (@{$json}) {
 	last if $stop;
 
@@ -78,7 +83,17 @@ foreach my $entry (@{$json}) {
 		next;
 	}
 
-	print "$file\n";
+	$counter++;
+	if ($silent == 0) {
+		print "$counter $file\n";
+	} elsif ($silent == 1) {
+		if (time() - $period > 60) {
+			$period = time();
+			print STDERR "Processed $counter files in a minute.\n";
+			$counter = 0;
+		}
+	}
+
 	$pm->start and next;
 
 	if ($verbose) {
