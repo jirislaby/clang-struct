@@ -1,3 +1,4 @@
+#include <charconv>
 #include <chrono>
 #include <thread>
 #include <vector>
@@ -270,13 +271,14 @@ int SQLConn::bindAndStep(SQLStmtHolder &ins, const Msg &msg)
 		if (type == Msg::TYPE::TEXT) {
 			ret = sqlite3_bind_text(ins, bindIdx, val.data(), val.length(), SQLITE_TRANSIENT);
 		} else if (type == Msg::TYPE::INT) {
-			try {
-				auto i = std::stoi(std::string(val));
-				ret = sqlite3_bind_int(ins, bindIdx, i);
-			} catch (std::invalid_argument const& ex) {
+			auto end = val.data() + val.size();
+			int i;
+			auto res = std::from_chars(val.data(), end, i);
+			if (res.ptr != end) {
 				std::cerr << "bad int val=\"" << val << "\"\n";
 				return -1;
 			}
+			ret = sqlite3_bind_int(ins, bindIdx, i);
 		} else if (type == Msg::TYPE::NUL) {
 			ret = sqlite3_bind_null(ins, bindIdx);
 		} else {
