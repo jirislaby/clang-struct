@@ -15,9 +15,4 @@ add_executable(db_filler
 target_link_libraries(db_filler ${SQLITE3_LIBRARIES})
 install(TARGETS db_filler)
 
-set(LLVM_OPTIONAL_SOURCES db_filler.cpp server.cpp sqlconn.cpp)
-
-add_llvm_library(clang-struct MODULE
-	clang-struct.cpp
-	Message.h
-	)
+add_subdirectory(clang-struct)

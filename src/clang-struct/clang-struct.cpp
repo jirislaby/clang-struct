@@ -14,7 +14,7 @@
 #include "clang/StaticAnalyzer/Core/PathSensitive/AnalysisManager.h"
 #include "clang/StaticAnalyzer/Frontend/CheckerRegistry.h"
 
-#include "Message.h"
+#include "../Message.h"
 
 using namespace clang;
 using namespace clang::ast_matchers;
