@@ -1,4 +1,5 @@
 #include <filesystem>
+#include <set>
 
 #include "clang/ASTMatchers/ASTMatchFinder.h"
 #include "clang/StaticAnalyzer/Core/Checker.h"
@@ -78,10 +79,10 @@ private:
 
 	void handleUse(const SourceRange &initSR, const NamedDecl *ND, const RecordType *ST,
 		       int load, bool implicit);
-	void handleUse(const MemberExpr *ME, const RecordType *ST) {
-		handleUse(ME->getSourceRange(), ME->getMemberDecl(), ST, -1, false);
+	void handleUse(const MemberExpr *ME, const RecordType *ST, int load) {
+		handleUse(ME->getSourceRange(), ME->getMemberDecl(), ST, load, false);
 	}
-	void handleME(const MemberExpr *ME);
+	void handleME(const MemberExpr *ME, int store);
 	void handleRD(const RecordDecl *RD);
 	void handleILE(const InitListExpr *ILE);
 
@@ -92,6 +93,7 @@ private:
 
 	Connection &conn;
 	std::filesystem::path &basePath;
+	std::set<const MemberExpr *> visited;
 };
 
 }
@@ -222,10 +224,12 @@ void MatchCallback::handleUse(const SourceRange &initSR, const NamedDecl *ND, co
 	conn.write(msg);
 }
 
-void MatchCallback::handleME(const MemberExpr *ME)
+void MatchCallback::handleME(const MemberExpr *ME, int store)
 {
-	//ME->dumpColor();
+	if (!visited.insert(ME).second)
+		return;
 
+	//ME->dumpColor();
 	//auto &SM = C.getSourceManager();
 
 	auto T = ME->getBase()->getType();
@@ -233,7 +237,7 @@ void MatchCallback::handleME(const MemberExpr *ME)
 		T = PT->getPointeeType();
 
 	if (auto ST = T->getAsStructureType()) {
-		handleUse(ME, ST);
+		handleUse(ME, ST, store);
 	} else if (/*auto RD =*/ T->getAsRecordDecl()) {
 		// TODO: anonymous member struct
 		//RD->dumpColor();
@@ -365,8 +369,11 @@ void MatchCallback::handleILE(const InitListExpr *ILE)
 
 void MatchCallback::run(const MatchFinder::MatchResult &res)
 {
+	if (auto BO = res.Nodes.getNodeAs<BinaryOperator>("ASSIGN")) {
+		handleME(llvm::cast<MemberExpr>(BO->getLHS()), 0);
+	}
 	if (auto ME = res.Nodes.getNodeAs<MemberExpr>("ME")) {
-		handleME(ME);
+		handleME(ME, -1);
 	}
 	if (auto RD = res.Nodes.getNodeAs<RecordDecl>("RD")) {
 		if (RD->isThisDeclarationADefinition())
@@ -397,6 +404,10 @@ void MyChecker::checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
 
 	MatchFinder F;
 	MatchCallback CB(A.getSourceManager(), conn, basePath);
+	F.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource,
+			      binaryOperator(isAssignmentOperator(),
+					     hasLHS(memberExpr())).bind("ASSIGN")),
+		     &CB);
 	F.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, memberExpr().bind("ME")),
 		     &CB);
 	F.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, recordDecl(isStruct()).bind("RD")),
