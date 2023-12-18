@@ -1,16 +1,20 @@
 #include <filesystem>
 
-#include <fcntl.h>
-#include <mqueue.h>
-
-#include <sys/stat.h>
-
 #include "clang/ASTMatchers/ASTMatchFinder.h"
 #include "clang/StaticAnalyzer/Core/Checker.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/AnalysisManager.h"
 #include "clang/StaticAnalyzer/Frontend/CheckerRegistry.h"
 
 #include "../Message.h"
+
+#ifdef STANDALONE
+#include "../sqlconn.h"
+#else
+#include <fcntl.h>
+#include <mqueue.h>
+
+#include <sys/stat.h>
+#endif
 
 using namespace clang;
 using namespace clang::ast_matchers;
@@ -20,18 +24,39 @@ using Msg = Message<std::string>;
 class Connection {
 public:
 	Connection() {}
-	~Connection();
 
-	int open();
-	void write(const Msg &msg);
+	virtual int open() = 0;
+	virtual void write(const Msg &msg) = 0;
+};
+
+#ifdef STANDALONE
+class SQLConnection : public Connection {
+public:
+	SQLConnection() : Connection() {}
+
+	virtual int open();
+	virtual void write(const Msg &msg);
+
+private:
+	SQLConn<std::string> sql;
+};
+#else
+class MQConnection : public Connection {
+public:
+	MQConnection() : Connection() {}
+	~MQConnection();
+
+	virtual int open();
+	virtual void write(const Msg &msg);
+
 private:
 #if 0
 	int sock = -1;
 #else
 	mqd_t mq = -1;
 #endif
-
 };
+#endif
 
 namespace {
 class MyChecker final : public Checker<check::EndOfTranslationUnit> {
@@ -71,7 +96,19 @@ private:
 
 }
 
-Connection::~Connection()
+#ifdef STANDALONE
+int SQLConnection::open()
+{
+	return sql.open();
+}
+
+void SQLConnection::write(const Msg &msg)
+{
+	sql.handleMessage(msg);
+}
+
+#else
+MQConnection::~MQConnection()
 {
 #if 0
 	if (sock >= 0)
@@ -82,7 +119,7 @@ Connection::~Connection()
 #endif
 }
 
-int Connection::open()
+int MQConnection::open()
 {
 #if 0
 	sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
@@ -112,7 +149,7 @@ int Connection::open()
 	return 0;
 }
 
-void Connection::write(const Msg &msg)
+void MQConnection::write(const Msg &msg)
 {
 #if 0
 	auto ret = ::write(sock, msg.c_str(), msg.length());
@@ -134,6 +171,7 @@ void Connection::write(const Msg &msg)
 	}
 #endif
 }
+#endif
 
 void MatchCallback::bindLoc(Msg &msg, const SourceRange &SR)
 {
@@ -343,7 +381,11 @@ void MyChecker::checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
 					  AnalysisManager &A,
 					  BugReporter &BR) const
 {
-	Connection conn;
+#ifdef STANDALONE
+	SQLConnection conn;
+#else
+	MQConnection conn;
+#endif
 
 	if (conn.open() < 0)
 		return;

@@ -18,7 +18,8 @@ static int busy_handler(void *data, int count)
 	return 1;
 }
 
-int SQLConn::openDB()
+template <typename T>
+int SQLConn<T>::openDB()
 {
 	sqlite3 *sql;
 	char *err;
@@ -140,7 +141,8 @@ int SQLConn::openDB()
 }
 
 
-int SQLConn::prepDB()
+template <typename T>
+int SQLConn<T>::prepDB()
 {
 	sqlite3_stmt *stmt;
 	int ret;
@@ -213,7 +215,8 @@ int SQLConn::prepDB()
 	return 0;
 }
 
-int SQLConn::open()
+template <typename T>
+int SQLConn<T>::open()
 {
 	if (openDB() < 0)
 		return EXIT_FAILURE;
@@ -223,7 +226,8 @@ int SQLConn::open()
 	return 0;
 }
 
-int SQLConn::begin()
+template <typename T>
+int SQLConn<T>::begin()
 {
 	char *err;
 	int ret = sqlite3_exec(sqlHolder, "BEGIN;", NULL, NULL, &err);
@@ -237,7 +241,8 @@ int SQLConn::begin()
 	return 0;
 }
 
-int SQLConn::end()
+template <typename T>
+int SQLConn<T>::end()
 {
 	char *err;
 	int ret = sqlite3_exec(sqlHolder, "END;", NULL, NULL, &err);
@@ -251,7 +256,8 @@ int SQLConn::end()
 	return 0;
 }
 
-int SQLConn::bindAndStep(SQLStmtHolder &ins, const Msg &msg)
+template <typename T>
+int SQLConn<T>::bindAndStep(SQLStmtHolder &ins, const Msg &msg)
 {
 	SQLStmtResetter insSrcResetter(sqlHolder, ins);
 	int ret;
@@ -307,7 +313,8 @@ int SQLConn::bindAndStep(SQLStmtHolder &ins, const Msg &msg)
 	return 0;
 }
 
-int SQLConn::handleMessage(const Msg &msg)
+template <typename T>
+int SQLConn<T>::handleMessage(const Msg &msg)
 {
 	auto kind = msg.getKind();
 
@@ -325,3 +332,9 @@ int SQLConn::handleMessage(const Msg &msg)
 
 	return -1;
 }
+
+#ifdef STANDALONE
+template class SQLConn<std::string>;
+#else
+template class SQLConn<std::string_view>;
+#endif

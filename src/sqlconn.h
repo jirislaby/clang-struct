@@ -4,9 +4,10 @@
 #include "Message.h"
 #include "sqlite.h"
 
+template <typename T>
 class SQLConn {
 public:
-	using Msg = Message<std::string_view>;
+	using Msg = Message<T>;
 
 	SQLConn() {}
 

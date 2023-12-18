@@ -19,8 +19,10 @@
 
 volatile std::sig_atomic_t stop;
 
+using SQLConnection = SQLConn<std::string_view>;
+
 static Server server;
-static SQLConn sqlConn;
+static SQLConnection sqlConn;
 
 void sig(int sig)
 {
@@ -73,7 +75,7 @@ int main(int argc, char **argv)
 	if (!autocommit && sqlConn.begin() < 0)
 		return EXIT_FAILURE;
 
-	SQLConn::Msg msg;
+	SQLConnection::Msg msg;
 	bool should_commit = false;
 
 	while (true) {

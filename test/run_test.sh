@@ -6,7 +6,7 @@ FILE="$1"
 DB='structs.db'
 CLANG='clang'
 
-"$CLANG" -cc1 -analyze -load clang-struct.so -analyzer-checker jirislaby.StructMembersChecker "$FILE"
+"$CLANG" -cc1 -analyze -load ../src/clang-struct/clang-struct-sa.so -analyzer-checker jirislaby.StructMembersChecker "$FILE"
 
 test -f "$DB"
 
