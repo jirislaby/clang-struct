@@ -1,12 +1,8 @@
 #include <filesystem>
 
-//#include <unistd.h>
-
 #include <fcntl.h>
 #include <mqueue.h>
 
-//#include <sys/socket.h>
-//#include <sys/un.h>
 #include <sys/stat.h>
 
 #include "clang/ASTMatchers/ASTMatchFinder.h"
