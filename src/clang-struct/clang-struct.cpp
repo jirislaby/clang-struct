@@ -369,12 +369,15 @@ void MatchCallback::handleILE(const InitListExpr *ILE)
 
 void MatchCallback::run(const MatchFinder::MatchResult &res)
 {
-	if (auto BO = res.Nodes.getNodeAs<BinaryOperator>("ASSIGN")) {
-		handleME(llvm::cast<MemberExpr>(BO->getLHS()), 0);
-	}
-	if (auto ME = res.Nodes.getNodeAs<MemberExpr>("ME")) {
+	if (auto ME = res.Nodes.getNodeAs<MemberExpr>("MESTORE"))
+		handleME(ME, 0);
+
+	if (auto ME = res.Nodes.getNodeAs<MemberExpr>("MELOAD"))
+		handleME(ME, 1);
+
+	if (auto ME = res.Nodes.getNodeAs<MemberExpr>("ME"))
 		handleME(ME, -1);
-	}
+
 	if (auto RD = res.Nodes.getNodeAs<RecordDecl>("RD")) {
 		if (RD->isThisDeclarationADefinition())
 			handleRD(RD);
@@ -406,7 +409,19 @@ void MyChecker::checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
 	MatchCallback CB(A.getSourceManager(), conn, basePath);
 	F.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource,
 			      binaryOperator(isAssignmentOperator(),
-					     hasLHS(memberExpr())).bind("ASSIGN")),
+					     hasLHS(memberExpr().bind("MESTORE")))),
+		     &CB);
+	F.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource,
+			      binaryOperator(hasEitherOperand(memberExpr().bind("MELOAD")))),
+		     &CB);
+	F.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource,
+			      unaryOperator(hasOperatorName("!"), hasUnaryOperand(memberExpr().bind("MELOAD")))),
+		     &CB);
+	F.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource,
+			      callExpr(forEachArgumentWithParam(memberExpr().bind("MELOAD"), anything()))),
+		     &CB);
+	F.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource,
+			      memberExpr(has(memberExpr())).bind("MELOAD")),
 		     &CB);
 	F.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, memberExpr().bind("ME")),
 		     &CB);
