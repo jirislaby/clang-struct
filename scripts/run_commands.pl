@@ -24,7 +24,8 @@ or die("Error in command line arguments\n");
 
 my %skip_files;
 if (-f $dbfile && $skip) {
-	my $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile","","") ||
+	my $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile", undef, undef,
+		{ AutoCommit => 0 }) ||
 		die "connect to db error: " . DBI::errstr;
 	%skip_files = map {
 		my $abs = File::Spec->catfile($basepath, @{$_}[0]);
