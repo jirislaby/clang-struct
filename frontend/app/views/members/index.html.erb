@@ -12,9 +12,9 @@
     <table class="structs">
       <thead>
         <tr>
-          <th>Struct <%= link_to('▲', request.params.merge({order: 'Struct', order_dir: 'asc'})) %><%= link_to('▼', request.params.merge({order: 'Struct', order_dir: 'desc'})) %></th>
-          <th>Member <%= link_to('▲', request.params.merge({order: 'Member', order_dir: 'asc'})) %><%= link_to('▼', request.params.merge({order: 'Member', order_dir: 'desc'})) %></th>
-          <th>File <%= link_to('▲', request.params.merge({order: 'File', order_dir: 'asc'})) %><%= link_to('▼', request.params.merge({order: 'File', order_dir: 'desc'})) %></th>
+          <th><%= generate_order_buttons('Struct') %></th>
+          <th><%= generate_order_buttons('Member') %></th>
+          <th><%= generate_order_buttons('File') %></th>
           <th>Line</th>
           <th>Column</th>
         </tr>
