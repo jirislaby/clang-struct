@@ -42,7 +42,7 @@ class StructsController < ApplicationController
                              "member.begLine == nested.begLine AND " <<
                              "member.begCol == nested.begCol LIMIT 1) " <<
                              "AS nested_id").
-      where(struct: @struct)
+           where(struct: @struct).order('member.begLine')
 
     respond_to do |format|
       format.html
