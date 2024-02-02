@@ -95,10 +95,12 @@ thead th, tr.dark td{
         padding: 3px 6px 3px 6px;
 }
 thead th a, th a:visited, tr.dark td a{
-        color: #ffffff;
+	color: #ffffff;
+	text-decoration: none;
 }
 thead th a:hover, tr.dark td a:hover{
-        color: #1088F9;
+	color: #1088F9;
+	text-decoration: underline;
 }
 
 .dark{
