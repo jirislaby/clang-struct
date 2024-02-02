@@ -1,5 +1,19 @@
 class MembersController < ApplicationController
   def index
+    order_dir = ''
+    if params[:order_dir] == 'desc'
+      order_dir = 'DESC';
+    end
+
+    case params[:order]
+    when 'Member'
+      order = 'member.name ' + order_dir + ', struct.name ' + order_dir
+    when 'File'
+      order = 'src_file ' + order_dir + ', member.begLine ' + order_dir
+    else
+      order = 'struct.name ' + order_dir + ', member.begLine ' + order_dir
+    end
+
     @members = Member
     if params[:unused] == '1'
       @members = @members.unused
@@ -35,7 +49,7 @@ class MembersController < ApplicationController
                                'struct.name AS struct_name',
                                'struct.begLine AS struct_begLine',
                                'source.src AS src_file').
-      order('struct.name, member.begLine')
+      order(order)
 
     respond_to do |format|
       format.html
