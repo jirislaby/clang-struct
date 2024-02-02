@@ -9,7 +9,6 @@
     <table class="structs">
       <thead>
         <tr>
-          <th>Number</th>
           <th>Struct</th>
           <th>Source</th>
           <th>Line</th>
@@ -19,7 +18,6 @@
       <tbody>
         <% @structs.each_with_index do |struct, i| %>
           <tr id="et<%= struct.id %>">
-            <td><%= @offset + i + 1 %></td>
             <td><%= link_to(struct.name, struct_path(struct)) %>
             (<%= src_link_to('src', struct.src_file, struct.begLine) %>)</td>
             <td><%= struct.src_file %></td>
