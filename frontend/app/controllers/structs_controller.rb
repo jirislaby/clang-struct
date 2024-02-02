@@ -1,5 +1,17 @@
 class StructsController < ApplicationController
   def index
+    order_dir = ''
+    if params[:order_dir] == 'desc'
+      order_dir = 'DESC';
+    end
+
+    case params[:order]
+    when 'Struct'
+      order = 'struct.name ' + order_dir + ', src_file ' + order_dir
+    else
+      order = 'src_file ' + order_dir + ', struct.begLine ' + order_dir
+    end
+
     @structs = MyStruct
     unless params[:filter].blank?
       @filter = "%#{params[:filter]}%"
@@ -27,7 +39,7 @@ class StructsController < ApplicationController
       @next_page = 0
     end
     @structs = @structs.select('struct.*', 'source.src AS src_file').
-      order('src_file, struct.begLine').limit(listing_limit)
+      order(order).limit(listing_limit)
 
     respond_to do |format|
       format.html
