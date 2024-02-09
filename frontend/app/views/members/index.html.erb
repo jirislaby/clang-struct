@@ -1,8 +1,10 @@
 <h1>Listing <% if params[:unused] == "1" %>potentially unused<% end %> members</h1>
 <div>
   <%= render 'shared/search_filters' do |form| %>
-    <%= form.label :unused, "Unused:" %>
-    <%= form.check_box :unused, :checked => params[:unused] == "1" %>&nbsp;
+    <%= form.check_box :noreserved, :checked => params[:noreserved] == "1" %>
+    <%= form.label :noreserved, "Exclude reserved members (like *reserved* or *pad*)" %><br/>
+    <%= form.check_box :unused, :checked => params[:unused] == "1" %>
+    <%= form.label :unused, "Unused members only" %><br/>
   <% end %>
   <div>
     Listing <strong><%= @offset %>-<%= @offset + @members_count %>/<%= @members_all_count %></strong> members.

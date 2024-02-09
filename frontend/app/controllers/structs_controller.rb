@@ -13,6 +13,9 @@ class StructsController < ApplicationController
     end
 
     @structs = MyStruct
+    if params[:nopacked] == '1'
+      @structs = @structs.nopacked
+    end
     unless params[:filter].blank?
       @filter = "%#{params[:filter]}%"
       @structs = @structs.where('struct.name LIKE ?', @filter)

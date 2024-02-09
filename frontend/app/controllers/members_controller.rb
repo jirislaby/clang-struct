@@ -23,11 +23,18 @@ class MembersController < ApplicationController
       @members = @members.where('member.name LIKE ? OR struct.name LIKE ?',
                                 @filter, @filter)
     end
+    if params[:noreserved] == '1'
+      @members = @members.where('member.name NOT LIKE ? AND member.name NOT LIKE ?',
+                                '%reserved%', '%pad%')
+    end
     unless params[:filter_file].blank?
       @filter = "%#{params[:filter_file]}%"
       @members = @members.where('source.src LIKE ?', @filter)
     end
     @members = @members.left_joins({:struct => :source})
+    if params[:nopacked] == '1'
+      @members = @members.merge(MyStruct.nopacked)
+    end
     @members_all_count = @members.count # ALL COUNT
 
     @page = @offset = 0
