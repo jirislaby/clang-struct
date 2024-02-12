@@ -95,7 +95,7 @@ int SQLConn<T>::openDB()
 				"struct.endLine || ':' || struct.endCol AS location "
 			"FROM struct LEFT JOIN source ON struct.src=source.id",
 		"members_view AS "
-			"SELECT member.id, struct.name AS struct, "
+			"SELECT member.id, struct.name AS struct, struct.attrs, "
 				"member.name AS member, source.src, "
 				"member.begLine || ':' || member.begCol || '-' || "
 				"member.endLine || ':' || member.endCol AS location "
@@ -103,7 +103,7 @@ int SQLConn<T>::openDB()
 			"LEFT JOIN struct ON member.struct=struct.id "
 			"LEFT JOIN source ON struct.src=source.id",
 		"use_view AS "
-			"SELECT use.id, struct.name AS struct, "
+			"SELECT use.id, struct.name AS struct, struct.attrs, "
 				"member.name AS member, source.src, "
 				"use.begLine || ':' || use.begCol || '-' || "
 				"use.endLine || ':' || use.endCol AS location, load, implicit "
