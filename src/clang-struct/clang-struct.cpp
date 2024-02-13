@@ -76,6 +76,7 @@ public:
 private:
 	void bindLoc(Msg &msg, const SourceRange &SR);
 	std::string getSrc(const SourceLocation &SLOC);
+	void addSrc(Msg &msg, const std::string &src);
 
 	void handleUse(const SourceRange &initSR, const NamedDecl *ND, const RecordType *ST,
 		       int load, bool implicit);
@@ -195,16 +196,23 @@ std::string MatchCallback::getSrc(const SourceLocation &SLOC)
 	return ret.string();
 }
 
+void MatchCallback::addSrc(Msg &msg, const std::string &src)
+{
+	msg.renew(Msg::KIND::SOURCE);
+
+	msg.add("src", src);
+	conn.write(msg);
+}
+
 void MatchCallback::handleUse(const SourceRange &initSR, const NamedDecl *ND, const RecordType *ST,
 			      int load, bool implicit)
 {
 	auto strLoc = ST->getDecl()->getBeginLoc();
 	auto strSrc = getSrc(strLoc);
 	auto useSrc = getSrc(initSR.getBegin());
-	Msg msg(Msg::KIND::SOURCE);
+	Msg msg;
 
-	msg.add("src", useSrc);
-	conn.write(msg);
+	addSrc(msg, useSrc);
 
 	msg.renew(Msg::KIND::USE);
 	msg.add("member", getNDName(ND));
@@ -273,10 +281,9 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 	auto RDSR = RD->getSourceRange();
 	auto RDName = getRDName(RD);
 	auto src = getSrc(RDSR.getBegin());
-	Msg msg(Msg::KIND::SOURCE);
+	Msg msg;
 
-	msg.add("src", src);
-	conn.write(msg);
+	addSrc(msg, src);
 
 	msg.renew(Msg::KIND::STRUCT);
 	msg.add("name", RDName);
