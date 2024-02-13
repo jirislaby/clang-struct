@@ -28,8 +28,15 @@ class MembersController < ApplicationController
                                 @filter, @filter)
     end
     if params[:noreserved] == '1'
-      @members = @members.where('member.name NOT LIKE ? AND member.name NOT LIKE ?',
-                                '%reserved%', '%pad%')
+      @members = @members.where('member.name NOT LIKE ? AND ' +
+                                'member.name NOT LIKE ? AND ' +
+                                'member.name NOT LIKE ? AND ' +
+                                'member.name NOT LIKE ? AND ' +
+                                'struct.name NOT LIKE ? AND ' +
+                                'struct.name NOT LIKE ?',
+                                '%dummy%', '%pad%', '%reserve%',
+                                '%unused%',
+                                'compat_%', 'trace_event_raw_%')
     end
     unless params[:filter_file].blank?
       @filter = "%#{params[:filter_file]}%"

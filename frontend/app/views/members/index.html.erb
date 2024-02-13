@@ -2,7 +2,7 @@
 <div>
   <%= render 'shared/search_filters' do |form| %>
     <%= form.check_box :noreserved, :checked => params[:noreserved] == "1" %>
-    <%= form.label :noreserved, "Exclude reserved members (like *reserved* or *pad*)" %><br/>
+    <%= form.label :noreserved, "Exclude special members (structs like compat_*, trace_event_* or members like *dummy*, *pad*, *reserved*, *unused*)" %><br/>
     <%= form.check_box :unused, :checked => params[:unused] == "1" %>
     <%= form.label :unused, "Unused members only" %><br/>
   <% end %>
