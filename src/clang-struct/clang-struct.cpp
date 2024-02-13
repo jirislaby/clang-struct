@@ -95,6 +95,7 @@ private:
 	Connection &conn;
 	std::filesystem::path &basePath;
 	std::set<const MemberExpr *> visited;
+	std::set<std::string> sources;
 };
 
 }
@@ -198,6 +199,9 @@ std::string MatchCallback::getSrc(const SourceLocation &SLOC)
 
 void MatchCallback::addSrc(Msg &msg, const std::string &src)
 {
+	if (!sources.insert(src).second)
+		return;
+
 	msg.renew(Msg::KIND::SOURCE);
 
 	msg.add("src", src);
