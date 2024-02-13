@@ -16,7 +16,11 @@ class MembersController < ApplicationController
 
     @members = Member
     if params[:unused] == '1'
-      @members = @members.unused
+      if params[:noimplicit] == '1'
+        @members = @members.noimplicit
+      else
+        @members = @members.unused
+      end
     end
     unless params[:filter].blank?
       @filter = "%#{params[:filter]}%"
