@@ -1,6 +1,6 @@
 # clang-struct – Indexed Structures of the Kernel
 
-*clang-struct* is a [clang](https://clang.llvm.org/) plugin which indexes structures, its members, and uses into a [sqlite3](https://www.sqlite.org/) database. *clang-struct* is primarily aimed, but not limited, to index the [Linux kernel](https://www.kernel.org/). When the code is indexed, it is easy to find unused members of structures or even whole structures.
+*clang-struct* is a [clang](https://clang.llvm.org/) plugin which indexes *structures*, its *members*, and *member uses* into an [sqlite3](https://www.sqlite.org/) database. *clang-struct* is primarily aimed, but not limited, to index the [Linux kernel](https://www.kernel.org/). When the code is indexed, it is easy to find unused members of structures or even whole structures.
 
 ## Building
 Proceed with the standard [cmake](https://cmake.org) steps like:
@@ -11,7 +11,7 @@ cmake -G Ninja ..
 ninja
 ```
 
-## Filling the Database
+## Filling in the Database
 ### Manually
 1. Run `db_filler`
 2. Run several `clang -cc1 -analyze -load clang-struct.so -analyzer-checker jirislaby.StructMembersChecker source.c` processes.
@@ -23,7 +23,9 @@ A batch runner (to do all the steps) is also available in `scripts/run_commands.
 make O=../build configure_the_kernel_as_usual
 make O=../build compile_commands.json
 cd ../build
-PATH=<path_with_built_binaries>:$PATH LD_LIBRARY_PATH=<path_with_clang-struct.so> run_commands.pl
+export PATH=<path_to_clang-struct_scripts>:$PATH
+export LD_LIBRARY_PATH=<path_to_clang-struct.so>
+run_commands.pl
 ```
 
 ## Looking at the Results
