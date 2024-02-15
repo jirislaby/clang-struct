@@ -16,7 +16,7 @@
         </tr>
       </thead>
       <tbody>
-        <% @structs.each_with_index do |struct, i| %>
+        <% @structs.each do |struct| %>
           <tr id="et<%= struct.id %>">
             <td><%= link_to(struct.name, struct_path(struct)) %>
             (<%= src_link_to('src', struct.src_file, struct.begLine) %>)</td>
