@@ -17,12 +17,12 @@ class StructsController < ApplicationController
       @structs = @structs.nopacked
     end
     unless params[:filter_struct].blank?
-      @filter = "%#{params[:filter_struct]}%"
-      @structs = @structs.where('struct.name LIKE ?', @filter)
+      filter = "%#{params[:filter_struct]}%"
+      @structs = @structs.where('struct.name LIKE ?', filter)
     end
     unless params[:filter_file].blank?
-      @filter = "%#{params[:filter_file]}%"
-      @structs = @structs.where('source.src LIKE ?', @filter)
+      filter = "%#{params[:filter_file]}%"
+      @structs = @structs.where('source.src LIKE ?', filter)
     end
     @structs = @structs.left_joins(:source)
     @structs_all_count = @structs.count # ALL COUNT

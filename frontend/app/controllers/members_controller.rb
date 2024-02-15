@@ -42,8 +42,8 @@ class MembersController < ApplicationController
                                 'compat_%', 'trace_event_raw_%')
     end
     unless params[:filter_file].blank?
-      @filter = "%#{params[:filter_file]}%"
-      @members = @members.where('source.src LIKE ?', @filter)
+      filter = "%#{params[:filter_file]}%"
+      @members = @members.where('source.src LIKE ?', filter)
     end
     @members = @members.left_joins({:struct => :source})
     if params[:nopacked] == '1'
