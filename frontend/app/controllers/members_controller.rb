@@ -22,10 +22,13 @@ class MembersController < ApplicationController
         @members = @members.unused
       end
     end
-    unless params[:filter].blank?
-      @filter = "%#{params[:filter]}%"
-      @members = @members.where('member.name LIKE ? OR struct.name LIKE ?',
-                                @filter, @filter)
+    unless params[:filter_struct].blank?
+      filter = "%#{params[:filter_struct]}%"
+      @members = @members.where('struct.name LIKE ?', filter)
+    end
+    unless params[:filter_member].blank?
+      filter = "%#{params[:filter_member]}%"
+      @members = @members.where('member.name LIKE ?', filter)
     end
     if params[:noreserved] == '1'
       @members = @members.where('member.name NOT LIKE ? AND ' +
