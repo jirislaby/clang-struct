@@ -9,6 +9,8 @@
         <th>Source</th>
         <th>Line</th>
         <th>Column</th>
+        <th>Access</th>
+        <th>Implicit</th>
       </tr>
     </thead>
     <tbody>
@@ -17,6 +19,8 @@
           <td><%= src_link_to(use.src_file, use.src_file, use.begLine) %></td>
           <td><%= use.begLine %></td>
           <td><%= use.begCol %></td>
+          <td><%= if use.load == nil then "unknown" else use.load == 1 ? "load" : "store" end %></td>
+          <td><%= use.implicit == 1 ? "true" : "false" %></td>
         </tr>
       <% end %>
     </tbody>
