@@ -71,7 +71,8 @@ int SQLConn<T>::openDB()
 			"src INTEGER NOT NULL REFERENCES source(id), "
 			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL, "
 			"endLine INTEGER, endCol INTEGER, "
-			"load INTEGER, implicit INTEGER NOT NULL, "
+			"load INTEGER CHECK(load IN (0, 1)), "
+			"implicit INTEGER NOT NULL CHECK(implicit IN (0, 1)), "
 			"UNIQUE(member, src, begLine))",
 	};
 
