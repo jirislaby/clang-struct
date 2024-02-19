@@ -294,6 +294,7 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 
 	std::stringstream ss;
 	bool cont = false;
+	bool packed = false;
 	for (const auto &f : RD->attrs()) {
 		// implicit attrs don't have names
 		if (!f->getAttrName()) {
@@ -305,11 +306,15 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 		}
 		if (cont)
 			ss << "|";
-		ss << f->getNormalizedFullName();
+		auto attr = f->getNormalizedFullName();
+		if (attr == "packed")
+			packed = true;
+		ss << attr;
 		cont = true;
 	}
 
 	msg.add("attrs", ss.str());
+	msg.add("packed", packed);
 	msg.add("src", src);
 	bindLoc(msg, RDSR);
 	conn.write(msg);

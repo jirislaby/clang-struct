@@ -8,5 +8,5 @@ class MyStruct < ApplicationRecord
   has_many :member, -> { order('begLine, begCol') }, :foreign_key => 'struct'
   belongs_to :source, :foreign_key => 'src'
 
-  scope :nopacked, -> { where('struct.attrs NOT LIKE ?', '%packed%') }
+  scope :nopacked, -> { where(:packed => 0) }
 end

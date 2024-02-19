@@ -54,8 +54,10 @@ int SQLConn<T>::openDB()
 		"source(id INTEGER PRIMARY KEY, "
 			"src TEXT NOT NULL UNIQUE)",
 		"struct(id INTEGER PRIMARY KEY, "
+			"parent INTEGER REFERENCES struct(id) ON DELETE CASCADE, "
 			"name TEXT NOT NULL, "
 			"attrs TEXT, "
+			"packed INTEGER NOT NULL CHECK(packed IN (0, 1)), "
 			"src INTEGER NOT NULL REFERENCES source(id) ON DELETE CASCADE, "
 			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL, "
 			"endLine INTEGER, endCol INTEGER, "
@@ -65,7 +67,14 @@ int SQLConn<T>::openDB()
 			"struct INTEGER NOT NULL REFERENCES struct(id) ON DELETE CASCADE, "
 			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL, "
 			"endLine INTEGER, endCol INTEGER, "
-			"UNIQUE(struct, name))",
+			"uses INTEGER NOT NULL DEFAULT 0, "
+			"loads INTEGER NOT NULL DEFAULT 0, "
+			"stores INTEGER NOT NULL DEFAULT 0, "
+			"implicit_uses INTEGER NOT NULL DEFAULT 0, "
+			"UNIQUE(struct, name), "
+			"CHECK(endLine >= begLine), "
+			"CHECK(uses >= loads + stores), "
+			"CHECK(uses >= implicit_uses))",
 		"use(id INTEGER PRIMARY KEY, "
 			"member INTEGER NOT NULL REFERENCES member(id) ON DELETE CASCADE, "
 			"src INTEGER NOT NULL REFERENCES source(id) ON DELETE CASCADE, "
@@ -73,7 +82,8 @@ int SQLConn<T>::openDB()
 			"endLine INTEGER, endCol INTEGER, "
 			"load INTEGER CHECK(load IN (0, 1)), "
 			"implicit INTEGER NOT NULL CHECK(implicit IN (0, 1)), "
-			"UNIQUE(member, src, begLine))",
+			"UNIQUE(member, src, begLine), "
+			"CHECK(endLine >= begLine))"
 	};
 
 	for (auto c: create_tables) {
@@ -89,9 +99,31 @@ int SQLConn<T>::openDB()
 		}
 	}
 
+	static const std::vector<std::pair<const char *, const char *>> create_triggers {
+		{ "TRIG_use_A_INS AFTER INSERT ON use", "UPDATE member SET uses = uses+1, "
+			"loads = loads + (NEW.load IS 1), "
+			"stores = stores + (NEW.load IS 0), "
+			"implicit_uses = implicit_uses + (NEW.implicit == 1) "
+			"WHERE id = NEW.member" },
+	};
+
+	for (auto c: create_triggers) {
+		std::string s("CREATE TRIGGER IF NOT EXISTS ");
+		s.append(c.first).append(" FOR EACH ROW BEGIN ").append(c.second).append("; END;");
+		ret = sqlite3_exec(sqlHolder, s.c_str(), NULL, NULL, &err);
+		if (ret != SQLITE_OK) {
+			std::cerr << "db CREATE failed (" << __LINE__ << "): " <<
+					sqlite3_errstr(ret) << " -> " <<
+					err << "\n\t" << s << "\n";
+			sqlite3_free(err);
+			return -1;
+		}
+	}
+
 	static const std::vector<const char *> create_views {
 		"structs_view AS "
-			"SELECT struct.id, struct.name AS struct, struct.attrs, source.src, "
+			"SELECT struct.id, struct.name AS struct, attrs, packed, "
+				"source.src, "
 				"struct.begLine || ':' || struct.begCol || '-' || "
 				"struct.endLine || ':' || struct.endCol AS location "
 			"FROM struct LEFT JOIN source ON struct.src=source.id",
@@ -99,7 +131,8 @@ int SQLConn<T>::openDB()
 			"SELECT member.id, struct.name AS struct, struct.attrs, "
 				"member.name AS member, source.src, "
 				"member.begLine || ':' || member.begCol || '-' || "
-				"member.endLine || ':' || member.endCol AS location "
+				"member.endLine || ':' || member.endCol AS location, "
+				"uses, loads, stores, implicit_uses "
 			"FROM member "
 			"LEFT JOIN struct ON member.struct=struct.id "
 			"LEFT JOIN source ON struct.src=source.id",
@@ -162,8 +195,8 @@ int SQLConn<T>::prepDB()
 
 	ret = sqlite3_prepare_v2(sqlHolder,
 				 "INSERT INTO "
-				 "struct(name, attrs, src, begLine, begCol, endLine, endCol) "
-				 "SELECT :name, :attrs, id, :begLine, :begCol, :endLine, :endCol "
+				 "struct(name, attrs, packed, src, begLine, begCol, endLine, endCol) "
+				 "SELECT :name, :attrs, :packed, id, :begLine, :begCol, :endLine, :endCol "
 					"FROM source WHERE src=:src;",
 				 -1, &stmt, NULL);
 	insStr.reset(stmt);
