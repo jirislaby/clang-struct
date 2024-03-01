@@ -149,7 +149,7 @@ int SQLConn<T>::prepDB()
 	int ret;
 
 	ret = sqlite3_prepare_v2(sqlHolder,
-				 "INSERT OR IGNORE INTO source(src) "
+				 "INSERT INTO source(src) "
 				 "VALUES (:src);",
 				 -1, &stmt, NULL);
 	insSrc.reset(stmt);
@@ -161,7 +161,7 @@ int SQLConn<T>::prepDB()
 	}
 
 	ret = sqlite3_prepare_v2(sqlHolder,
-				 "INSERT OR IGNORE INTO "
+				 "INSERT INTO "
 				 "struct(name, attrs, src, begLine, begCol, endLine, endCol) "
 				 "SELECT :name, :attrs, id, :begLine, :begCol, :endLine, :endCol "
 					"FROM source WHERE src=:src;",
@@ -175,7 +175,7 @@ int SQLConn<T>::prepDB()
 	}
 
 	ret = sqlite3_prepare_v2(sqlHolder,
-				 "INSERT OR IGNORE INTO "
+				 "INSERT INTO "
 				 "member(name, struct, begLine, begCol, endLine, endCol) "
 				 "SELECT :name, struct.id, :begLine, :begCol, :endLine, :endCol "
 					"FROM struct LEFT JOIN source ON struct.src=source.id "
@@ -192,7 +192,7 @@ int SQLConn<T>::prepDB()
 	}
 
 	ret = sqlite3_prepare_v2(sqlHolder,
-				 "INSERT OR IGNORE INTO "
+				 "INSERT INTO "
 				 "use(member, src, begLine, begCol, endLine, endCol, load, implicit) "
 				 "SELECT (SELECT member.id FROM member "
 						"LEFT JOIN struct ON member.struct=struct.id "
@@ -303,7 +303,7 @@ int SQLConn<T>::bindAndStep(SQLStmtHolder &ins, const Msg &msg)
 	}
 
 	ret = sqlite3_step(ins);
-	if (ret != SQLITE_DONE) {
+	if (ret != SQLITE_DONE && sqlite3_extended_errcode(sqlHolder) != SQLITE_CONSTRAINT_UNIQUE) {
 		std::cerr << "db step failed (" << __LINE__ << "): " <<
 			     sqlite3_errstr(ret) << " -> " <<
 			     sqlite3_errmsg(sqlHolder) << "\n";

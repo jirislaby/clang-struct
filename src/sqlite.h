@@ -33,7 +33,7 @@ struct SQLStmtResetter {
 	SQLStmtResetter(sqlite3 *sql, sqlite3_stmt *stmt) : sql(sql), stmt(stmt) { }
 	~SQLStmtResetter() {
 		int ret = sqlite3_reset(stmt);
-		if (ret != SQLITE_OK) {
+		if (ret != SQLITE_OK && ret != SQLITE_CONSTRAINT) {
 		    std::cerr << "stmt reset failed (" << __LINE__ << "): " <<
 				sqlite3_errstr(ret) << " -> " <<
 				sqlite3_errmsg(sql) << "\n";
