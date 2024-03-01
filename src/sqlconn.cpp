@@ -294,8 +294,8 @@ int SQLConn<T>::bindAndStep(SQLStmtHolder &ins, const Msg &msg)
 		}
 
 		if (ret != SQLITE_OK) {
-			std::cerr << "db bind failed (" << __LINE__ << "/" << key << "/" <<
-				     val << "): " <<
+			std::cerr << "db bind failed (" << __LINE__ << " key=\"" << key <<
+				     "\" val=\"" << val << "\"): " <<
 				     sqlite3_errstr(ret) << " -> " <<
 				     sqlite3_errmsg(sqlHolder) << "\n";
 			return -1;
