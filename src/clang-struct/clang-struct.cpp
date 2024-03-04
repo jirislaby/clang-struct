@@ -416,8 +416,14 @@ void MyChecker::checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
 	auto basePathStr = A.getAnalyzerOptions().getCheckerStringOption(this, "basePath");
 	std::filesystem::path basePath(basePathStr.str());
 
-	MatchFinder F;
 	MatchCallback CB(A.getSourceManager(), conn, basePath);
+
+	MatchFinder FRD;
+	FRD.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, recordDecl(isStruct()).bind("RD")),
+		     &CB);
+	FRD.matchAST(A.getASTContext());
+
+	MatchFinder F;
 	F.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource,
 			      binaryOperator(isAssignmentOperator(),
 					     hasLHS(memberExpr().bind("MESTORE")))),
@@ -435,8 +441,6 @@ void MyChecker::checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
 			      memberExpr(has(memberExpr())).bind("MELOAD")),
 		     &CB);
 	F.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, memberExpr().bind("ME")),
-		     &CB);
-	F.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, recordDecl(isStruct()).bind("RD")),
 		     &CB);
 	F.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, initListExpr().bind("ILE")),
 		     &CB);
