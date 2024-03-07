@@ -49,7 +49,8 @@ class MembersController < ApplicationController
     if params[:nopacked] == '1'
       @members = @members.merge(MyStruct.nopacked)
     end
-    @members_all_count = @members.count # ALL COUNT
+
+    listing_limit_cropped = listing_limit * 3 + 1
 
     @page = @offset = 0
     unless params[:page].blank?
@@ -57,10 +58,17 @@ class MembersController < ApplicationController
       @offset = @page * listing_limit
       @members = @members.offset(@offset)
     end
+    @members = @members.limit(listing_limit_cropped)
+    @members_all_count = @members.count # ALL COUNT
+
     @members = @members.limit(listing_limit)
     @members_count = @members.count # COUNT
 
+    @members_all_count += @offset
     if @members_all_count > @offset + listing_limit
+      if @members_all_count >= @offset + listing_limit_cropped
+        @members_all_count = "many"
+      end
       @next_page = @page + 1
     else
       @next_page = 0
