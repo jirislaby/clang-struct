@@ -1,4 +1,4 @@
-<h1>Listing structure <%= @struct.name %></h1>
+<h1>Listing <%= @struct.type == 's' ? 'structure' : 'union' %> <%= @struct.name %></h1>
 <div>
   Defined in <%= @struct.src_file %> at line <%= @struct.begLine %>
   column <%= @struct.begCol %>.
@@ -18,7 +18,7 @@
                              member.begLine) %>)
                              <%if member.nested_id != nil %>
                                <b>
-                               <%= link_to('-> continue to nested structure here', struct_path(member.nested_id)) %>
+                               <%= link_to('-> continue to nested structure/union here', struct_path(member.nested_id)) %>
                                </b>
             <% end %>
           </td>

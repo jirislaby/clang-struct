@@ -55,6 +55,7 @@ int SQLConn<T>::openDB()
 			"src TEXT NOT NULL UNIQUE)",
 		"struct(id INTEGER PRIMARY KEY, "
 			"parent INTEGER REFERENCES struct(id) ON DELETE CASCADE, "
+			"type TEXT NOT NULL CHECK(type IN ('s', 'u')), "
 			"name TEXT NOT NULL, "
 			"attrs TEXT, "
 			"packed INTEGER NOT NULL CHECK(packed IN (0, 1)), "
@@ -122,7 +123,7 @@ int SQLConn<T>::openDB()
 
 	static const std::vector<const char *> create_views {
 		"structs_view AS "
-			"SELECT struct.id, struct.name AS struct, attrs, packed, "
+			"SELECT struct.id, type, struct.name AS struct, attrs, packed, "
 				"source.src, "
 				"struct.begLine || ':' || struct.begCol || '-' || "
 				"struct.endLine || ':' || struct.endCol AS location "
@@ -195,8 +196,8 @@ int SQLConn<T>::prepDB()
 
 	ret = sqlite3_prepare_v2(sqlHolder,
 				 "INSERT INTO "
-				 "struct(name, attrs, packed, src, begLine, begCol, endLine, endCol) "
-				 "SELECT :name, :attrs, :packed, id, :begLine, :begCol, :endLine, :endCol "
+				 "struct(type, name, attrs, packed, src, begLine, begCol, endLine, endCol) "
+				 "SELECT :type, :name, :attrs, :packed, id, :begLine, :begCol, :endLine, :endCol "
 					"FROM source WHERE src=:src;",
 				 -1, &stmt, NULL);
 	insStr.reset(stmt);

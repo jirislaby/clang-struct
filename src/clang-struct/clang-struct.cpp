@@ -292,6 +292,17 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 	msg.renew(Msg::KIND::STRUCT);
 	msg.add("name", RDName);
 
+	std::string type;
+	if (RD->isStruct())
+		type = "s";
+	else if (RD->isUnion())
+		type = "u";
+	else {
+		llvm::errs() << "unnamed attribute in:\n";
+		RD->dumpColor();
+		return;
+	}
+
 	std::stringstream ss;
 	bool cont = false;
 	bool packed = false;
@@ -313,6 +324,7 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 		cont = true;
 	}
 
+	msg.add("type", type);
 	msg.add("attrs", ss.str());
 	msg.add("packed", packed);
 	msg.add("src", src);
@@ -424,7 +436,7 @@ void MyChecker::checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
 	MatchCallback CB(A.getSourceManager(), conn, basePath);
 
 	MatchFinder FRD;
-	FRD.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, recordDecl(isStruct()).bind("RD")),
+	FRD.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, recordDecl().bind("RD")),
 		     &CB);
 	FRD.matchAST(A.getASTContext());
 

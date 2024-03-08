@@ -75,6 +75,7 @@ class MembersController < ApplicationController
     end
 
     @members = @members.select('member.*', 'member.struct AS struct_id',
+                               'struct.type AS struct_type',
                                'struct.name AS struct_name',
                                'struct.begLine AS struct_begLine',
                                'source.src AS src_file').

@@ -9,7 +9,7 @@
     <table class="structs">
       <thead>
         <tr>
-          <th><%= generate_order_buttons('Struct') %></th>
+          <th><%= generate_order_buttons('Struct/Union') %></th>
           <th><%= generate_order_buttons('Member') %></th>
           <th><%= generate_order_buttons('File') %></th>
           <th>Line</th>
@@ -19,7 +19,7 @@
       <tbody>
         <% @members.each do |member| %>
           <tr id="et<%= member.id %>">
-            <td><%= link_to(member.struct_name, struct_path(member.struct_id)) %>
+            <td><%= member.struct_type == 's' ? 'struct' : 'union' %> <%= link_to(member.struct_name, struct_path(member.struct_id)) %>
             (<%= src_link_to('src', member.src_file,
                              member.struct_begLine) %>)</td>
             <td><%= link_to(member.name, struct_use_path(member.struct_id, member)) %>

@@ -1,4 +1,5 @@
 class MyStruct < ApplicationRecord
+  self.inheritance_column = :type_for_ror
   # MyStruct vs reserved Struct
   def self.model_name
     ActiveModel::Name.new(self, nil, "struct")
