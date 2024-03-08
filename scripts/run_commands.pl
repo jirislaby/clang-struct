@@ -108,10 +108,13 @@ foreach my $entry (@{$json}) {
 	chdir $entry->{'directory'} or die "cannot cd to $entry->{'directory'}";
 
 	my $cmd = $entry->{'command'};
-	$cmd .= ' -w -E -o - | clang -cc1 -analyze -w';
-	$cmd .= ' -load clang-struct.so';
-	$cmd .= ' -analyzer-checker jirislaby.StructMembersChecker';
-	$cmd .= " -analyzer-config jirislaby.StructMembersChecker:basePath=$basepath";
+	$cmd =~ s/\s+-W[^\s]+//g;
+	$cmd =~ s/\s+-c\b//;
+	$cmd =~ s@\s+-o\s*[^\s]+@ -o /dev/null@;
+	$cmd .= ' -w --analyze --analyzer-no-default-checks';
+	$cmd .= ' -Xclang -load -Xclang clang-struct.so';
+	$cmd .= ' -Xclang -analyzer-checker -Xclang jirislaby.StructMembersChecker';
+	$cmd .= " -Xclang -analyzer-config -Xclang jirislaby.StructMembersChecker:basePath=$basepath";
 	#print "$cmd\n";
 	exec($cmd);
 }
