@@ -250,9 +250,8 @@ void MatchCallback::handleME(const MemberExpr *ME, int store)
 
 	if (auto ST = T->getAsStructureType()) {
 		handleUse(ME, ST->getDecl(), store);
-	} else if (/*auto RD =*/ T->getAsRecordDecl()) {
-		// TODO: anonymous member struct
-		//RD->dumpColor();
+	} else if (auto RD = T->getAsRecordDecl()) {
+		handleUse(ME, RD, store);
 	} else {
 		llvm::errs() << __PRETTY_FUNCTION__ << ": unhandled type\n";
 		ME->getSourceRange().dump(SM);
