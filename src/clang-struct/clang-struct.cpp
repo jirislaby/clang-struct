@@ -78,10 +78,10 @@ private:
 	std::string getSrc(const SourceLocation &SLOC);
 	void addSrc(Msg &msg, const std::string &src);
 
-	void handleUse(const SourceRange &initSR, const NamedDecl *ND, const RecordType *ST,
+	void handleUse(const SourceRange &initSR, const NamedDecl *ND, const RecordDecl *RD,
 		       int load, bool implicit);
-	void handleUse(const MemberExpr *ME, const RecordType *ST, int load) {
-		handleUse(ME->getSourceRange(), ME->getMemberDecl(), ST, load, false);
+	void handleUse(const MemberExpr *ME, const RecordDecl *RD, int load) {
+		handleUse(ME->getSourceRange(), ME->getMemberDecl(), RD, load, false);
 	}
 	void handleME(const MemberExpr *ME, int store);
 	void handleRD(const RecordDecl *RD);
@@ -208,10 +208,10 @@ void MatchCallback::addSrc(Msg &msg, const std::string &src)
 	conn.write(msg);
 }
 
-void MatchCallback::handleUse(const SourceRange &initSR, const NamedDecl *ND, const RecordType *ST,
+void MatchCallback::handleUse(const SourceRange &initSR, const NamedDecl *ND, const RecordDecl *RD,
 			      int load, bool implicit)
 {
-	auto strLoc = ST->getDecl()->getBeginLoc();
+	auto strLoc = RD->getBeginLoc();
 	auto strSrc = getSrc(strLoc);
 	auto useSrc = getSrc(initSR.getBegin());
 	Msg msg;
@@ -220,7 +220,7 @@ void MatchCallback::handleUse(const SourceRange &initSR, const NamedDecl *ND, co
 
 	msg.renew(Msg::KIND::USE);
 	msg.add("member", getNDName(ND));
-	msg.add("struct", getRDName(ST->getDecl()));
+	msg.add("struct", getRDName(RD));
 	msg.add("strSrc", strSrc);
 	msg.add("strLine", SM.getPresumedLineNumber(strLoc));
 	msg.add("strCol", SM.getPresumedColumnNumber(strLoc));
@@ -249,7 +249,7 @@ void MatchCallback::handleME(const MemberExpr *ME, int store)
 		T = PT->getPointeeType();
 
 	if (auto ST = T->getAsStructureType()) {
-		handleUse(ME, ST, store);
+		handleUse(ME, ST->getDecl(), store);
 	} else if (/*auto RD =*/ T->getAsRecordDecl()) {
 		// TODO: anonymous member struct
 		//RD->dumpColor();
@@ -382,7 +382,7 @@ void MatchCallback::handleILE(const InitListExpr *ILE)
 			if (!SR.isValid())
 				SR = ILE->getSourceRange();
 
-			handleUse(SR, field, RT, 0, implicit);
+			handleUse(SR, field, RD, 0, implicit);
 		}
 	} else if (T->isUnionType()) {
 	} else if (!T->isConstantArrayType() && !llvm::isa<TypeOfType>(T) &&
