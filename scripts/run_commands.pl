@@ -53,6 +53,11 @@ sub getNumCpu() {
 	return $ret;
 }
 
+sub time_m_s($) {
+	my $t = shift;
+	return int($t / 60) . "m" . $t % 60 . "s";
+}
+
 my $pm = Parallel::ForkManager->new(getNumCpu());
 $pm->set_waitpid_blocking_sleep(0);
 my $stop = 0;
@@ -70,9 +75,11 @@ if (!$daemon) {
 	die;
 }
 
-my $period = time();
+my $start_time = time;
+my $period = $start_time;
 my $counter = 0;
-my $remaining = scalar @{$json};
+my $count = scalar @{$json};
+my $remaining = $count;
 
 foreach my $entry (@{$json}) {
 	last if $stop;
@@ -92,7 +99,10 @@ foreach my $entry (@{$json}) {
 	} elsif ($silent == 1) {
 		if (time() - $period > 60) {
 			$period = time();
-			print STDERR "Processed $counter files in a minute. $remaining remaining.\n";
+			my $elapsed = $period - $start_time;
+			my $projected = $elapsed * $count / ($count - $remaining);
+			print STDERR "Processed $counter files in a minute. $remaining remaining. ",
+				time_m_s($elapsed), "/", time_m_s($projected), "\n";
 
 			$counter = 0;
 		}
