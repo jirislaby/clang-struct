@@ -72,7 +72,7 @@ int SQLConn<T>::openDB()
 			"loads INTEGER NOT NULL DEFAULT 0, "
 			"stores INTEGER NOT NULL DEFAULT 0, "
 			"implicit_uses INTEGER NOT NULL DEFAULT 0, "
-			"UNIQUE(struct, name), "
+			"UNIQUE(struct, name, begLine, begCol), "
 			"CHECK(endLine >= begLine), "
 			"CHECK(uses >= loads + stores), "
 			"CHECK(uses >= implicit_uses))",
