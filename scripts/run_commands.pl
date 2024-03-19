@@ -3,7 +3,9 @@ use strict;
 use warnings;
 use DBI;
 use Cwd 'abs_path';
+use Error qw(:try);
 use File::Spec;
+use Git;
 use Getopt::Long;
 use JSON;
 use Parallel::ForkManager;
@@ -12,7 +14,7 @@ my $basepath = "";
 my $dbfile = 'structs.db';
 my $filter;
 my $silent = 0;
-my $skip = '';
+my $skip = 0;
 my $verbose = 0;
 GetOptions(
 	"basepath=s"	=> \$basepath,
@@ -23,17 +25,55 @@ GetOptions(
 or die("Error in command line arguments\n");
 
 my %skip_files;
-if (-f $dbfile && $skip) {
-	my $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile", undef, undef,
-		{ AutoCommit => 0 }) ||
-		die "connect to db error: " . DBI::errstr;
+
+my $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile", undef, undef,
+	{ AutoCommit => 0 }) ||
+	die "connect to db error: " . DBI::errstr;
+
+$dbh->do(<<'EOF'
+CREATE TABLE IF NOT EXISTS run(
+	id INTEGER PRIMARY KEY,
+	version TEXT,
+	sha TEXT,
+	filter TEXT,
+	skip INTEGER NOT NULL CHECK(skip IN (0, 1)),
+	timestamp TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW', 'localtime'))
+) STRICT;
+EOF
+) || die "cannot CREATE TABLE";
+
+my $sha;
+my $version;
+foreach my $srctree (qw|. source|) {
+	next unless (-d "$srctree/.git");
+
+	my $repo = Git->repository(Directory => "$srctree/.git");
+	try {
+		$sha = $repo->command_oneline([ 'rev-parse', '--verify', 'HEAD' ], STDERR => 0);
+		$sha = substr($sha, 0, 12);
+	} catch Git::Error::Command with {
+	};
+	try {
+		$version = $repo->command_oneline([ 'describe', '--contains',
+			'--exact-match', 'HEAD'], STDERR => 0);
+		$version =~ s/\^0$//;
+	} catch Git::Error::Command with {
+	};
+	last;
+}
+
+my $ins = $dbh->prepare('INSERT INTO run(version, sha, filter, skip) VALUES (?, ?, ?, ?)') || die "cannot prepare";
+$ins->execute($version, $sha, $filter, $skip);
+$dbh->commit;
+
+if ($skip) {
 	%skip_files = map {
 		my $abs = File::Spec->catfile($basepath, @{$_}[0]);
 		$abs = abs_path($abs);
 		$abs => 1
 	} $dbh->selectall_array(q@SELECT src FROM source WHERE src LIKE '%.c';@);
-	$dbh->disconnect;
 }
+$dbh->disconnect;
 
 my $json;
 {
