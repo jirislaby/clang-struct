@@ -51,9 +51,17 @@ int SQLConn<T>::openDB()
 	}
 
 	static const std::vector<const char *> create_tables {
+		"run(id INTEGER PRIMARY KEY, "
+			"version TEXT, "
+			"sha TEXT, "
+			"filter TEXT, "
+			"skip INTEGER NOT NULL CHECK(skip IN (0, 1)), "
+			"timestamp TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW', 'localtime')))",
 		"source(id INTEGER PRIMARY KEY, "
+			"run INTEGER REFERENCES run(id), "
 			"src TEXT NOT NULL UNIQUE)",
 		"struct(id INTEGER PRIMARY KEY, "
+			"run INTEGER REFERENCES run(id), "
 			"parent INTEGER REFERENCES struct(id) ON DELETE CASCADE, "
 			"type TEXT NOT NULL CHECK(type IN ('s', 'u')), "
 			"name TEXT NOT NULL, "
@@ -64,6 +72,7 @@ int SQLConn<T>::openDB()
 			"endLine INTEGER, endCol INTEGER, "
 			"UNIQUE(name, src, begLine, begCol))",
 		"member(id INTEGER PRIMARY KEY, "
+			"run INTEGER REFERENCES run(id), "
 			"name TEXT NOT NULL, "
 			"struct INTEGER NOT NULL REFERENCES struct(id) ON DELETE CASCADE, "
 			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL, "
@@ -77,6 +86,7 @@ int SQLConn<T>::openDB()
 			"CHECK(uses >= loads + stores), "
 			"CHECK(uses >= implicit_uses))",
 		"use(id INTEGER PRIMARY KEY, "
+			"run INTEGER REFERENCES run(id), "
 			"member INTEGER NOT NULL REFERENCES member(id) ON DELETE CASCADE, "
 			"src INTEGER NOT NULL REFERENCES source(id) ON DELETE CASCADE, "
 			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL, "
@@ -122,14 +132,14 @@ int SQLConn<T>::openDB()
 	}
 
 	static const std::vector<const char *> create_views {
-		"structs_view AS "
-			"SELECT struct.id, type, struct.name AS struct, attrs, packed, "
-				"source.src, "
+		"struct_view AS "
+			"SELECT struct.id, struct.run AS run, type, "
+				"struct.name AS struct, attrs, packed, source.src, "
 				"struct.begLine || ':' || struct.begCol || '-' || "
 				"struct.endLine || ':' || struct.endCol AS location "
 			"FROM struct LEFT JOIN source ON struct.src=source.id",
-		"members_view AS "
-			"SELECT member.id, struct.name AS struct, struct.attrs, "
+		"member_view AS "
+			"SELECT member.id, member.run AS run, struct.name AS struct, struct.attrs, "
 				"member.name AS member, source.src, "
 				"member.begLine || ':' || member.begCol || '-' || "
 				"member.endLine || ':' || member.endCol AS location, "
@@ -138,7 +148,7 @@ int SQLConn<T>::openDB()
 			"LEFT JOIN struct ON member.struct=struct.id "
 			"LEFT JOIN source ON struct.src=source.id",
 		"use_view AS "
-			"SELECT use.id, struct.name AS struct, struct.attrs, "
+			"SELECT use.id, use.run AS run, struct.name AS struct, struct.attrs, "
 				"member.name AS member, source.src, "
 				"use.begLine || ':' || use.begCol || '-' || "
 				"use.endLine || ':' || use.endCol AS location, load, implicit "
@@ -147,8 +157,8 @@ int SQLConn<T>::openDB()
 			"LEFT JOIN struct ON member.struct=struct.id "
 			"LEFT JOIN source ON use.src=source.id",
 		"unused_view AS "
-			"SELECT struct.name AS struct, struct.attrs, member.name AS member, "
-				"source.src, "
+			"SELECT member.run AS run, struct.name AS struct, struct.attrs, "
+				"member.name AS member, source.src, "
 				"member.begLine || ':' || member.begCol || '-' || "
 				"member.endLine || ':' || member.endCol AS location "
 			"FROM member "
@@ -183,8 +193,8 @@ int SQLConn<T>::prepDB()
 	int ret;
 
 	ret = sqlite3_prepare_v2(sqlHolder,
-				 "INSERT INTO source(src) "
-				 "VALUES (:src);",
+				 "INSERT INTO source(run, src) "
+				 "VALUES (:run, :src);",
 				 -1, &stmt, NULL);
 	insSrc.reset(stmt);
 	if (ret != SQLITE_OK) {
@@ -196,8 +206,8 @@ int SQLConn<T>::prepDB()
 
 	ret = sqlite3_prepare_v2(sqlHolder,
 				 "INSERT INTO "
-				 "struct(type, name, attrs, packed, src, begLine, begCol, endLine, endCol) "
-				 "SELECT :type, :name, :attrs, :packed, id, :begLine, :begCol, :endLine, :endCol "
+				 "struct(run, type, name, attrs, packed, src, begLine, begCol, endLine, endCol) "
+				 "SELECT :run, :type, :name, :attrs, :packed, id, :begLine, :begCol, :endLine, :endCol "
 					"FROM source WHERE src=:src;",
 				 -1, &stmt, NULL);
 	insStr.reset(stmt);
@@ -210,8 +220,8 @@ int SQLConn<T>::prepDB()
 
 	ret = sqlite3_prepare_v2(sqlHolder,
 				 "INSERT INTO "
-				 "member(name, struct, begLine, begCol, endLine, endCol) "
-				 "SELECT :name, struct.id, :begLine, :begCol, :endLine, :endCol "
+				 "member(run, name, struct, begLine, begCol, endLine, endCol) "
+				 "SELECT :run, :name, struct.id, :begLine, :begCol, :endLine, :endCol "
 					"FROM struct LEFT JOIN source ON struct.src=source.id "
 					"WHERE source.src=:src AND "
 					"begLine=:strBegLine AND begCol=:strBegCol AND "
@@ -227,8 +237,8 @@ int SQLConn<T>::prepDB()
 
 	ret = sqlite3_prepare_v2(sqlHolder,
 				 "INSERT INTO "
-				 "use(member, src, begLine, begCol, endLine, endCol, load, implicit) "
-				 "SELECT (SELECT member.id FROM member "
+				 "use(run, member, src, begLine, begCol, endLine, endCol, load, implicit) "
+				 "SELECT :run, (SELECT member.id FROM member "
 						"LEFT JOIN struct ON member.struct=struct.id "
 						"LEFT JOIN source ON struct.src=source.id "
 						"WHERE member.name=:member AND "

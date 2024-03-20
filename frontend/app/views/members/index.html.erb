@@ -20,12 +20,12 @@
         <% @members.each do |member| %>
           <tr id="et<%= member.id %>">
             <td><%= member.struct_type == 's' ? 'struct' : 'union' %> <%= link_to(member.struct_name, struct_path(member.struct_id)) %>
-            (<%= src_link_to('src', member.src_file,
+            (<%= src_link_to('src', member.version, member.src_file,
                              member.struct_begLine) %>)</td>
             <td><%= link_to(member.name, struct_use_path(member.struct_id, member)) %>
-            (<%= src_link_to('src', member.src_file,
+            (<%= src_link_to('src', member.version, member.src_file,
                              member.begLine) %>)</td>
-            <td><%= src_link_to(member.src_file, member.src_file) %></td>
+            <td><%= src_link_to(member.src_file, member.version, member.src_file) %></td>
             <td><%= member.begLine %></td>
             <td><%= member.begCol %></td>
           </tr>

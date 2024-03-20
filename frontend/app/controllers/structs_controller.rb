@@ -25,6 +25,7 @@ class StructsController < ApplicationController
       @structs = @structs.where('source.src LIKE ?', filter)
     end
     @structs = @structs.left_joins(:source)
+    @structs = @structs.left_joins(:run)
     @structs_all_count = @structs.count # ALL COUNT
 
     @page = @offset = 0
@@ -41,7 +42,7 @@ class StructsController < ApplicationController
     else
       @next_page = 0
     end
-    @structs = @structs.select('struct.*', 'source.src AS src_file').
+    @structs = @structs.select('struct.*', 'source.src AS src_file', 'run.version').
       order(order).limit(listing_limit)
 
     respond_to do |format|
@@ -51,7 +52,7 @@ class StructsController < ApplicationController
 
   def show
     @struct = MyStruct.left_joins(:source).select('struct.*', 'source.src AS src_file').find(params[:id])
-    @members = Member.select('member.*',
+    @members = Member.left_joins(:run).select('member.*', 'run.version',
                              "(SELECT id FROM struct AS nested " <<
                              "WHERE nested.src = #{@struct.src} AND " <<
                              "member.begLine == nested.begLine AND " <<

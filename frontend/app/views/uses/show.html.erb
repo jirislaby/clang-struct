@@ -16,7 +16,7 @@
     <tbody>
       <% @uses.each do |use| %>
         <tr>
-          <td><%= src_link_to(use.src_file, use.src_file, use.begLine) %></td>
+          <td><%= src_link_to(use.src_file, use.version, use.src_file, use.begLine) %></td>
           <td><%= use.begLine %></td>
           <td><%= use.begCol %></td>
           <td><%= if use.load == nil then "unknown" else use.load == 1 ? "load" : "store" end %></td>

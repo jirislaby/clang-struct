@@ -45,7 +45,7 @@ class MembersController < ApplicationController
       filter = "%#{params[:filter_file]}%"
       @members = @members.where('source.src LIKE ?', filter)
     end
-    @members = @members.left_joins({:struct => :source})
+    @members = @members.left_joins({:struct => :source}).left_joins(:run)
     if params[:nopacked] == '1'
       @members = @members.merge(MyStruct.nopacked)
     end
@@ -75,6 +75,7 @@ class MembersController < ApplicationController
     end
 
     @members = @members.select('member.*', 'member.struct AS struct_id',
+                               'run.version',
                                'struct.type AS struct_type',
                                'struct.name AS struct_name',
                                'struct.begLine AS struct_begLine',

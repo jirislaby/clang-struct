@@ -64,6 +64,7 @@ foreach my $srctree (qw|. source|) {
 
 my $ins = $dbh->prepare('INSERT INTO run(version, sha, filter, skip) VALUES (?, ?, ?, ?)') || die "cannot prepare";
 $ins->execute($version, $sha, $filter, $skip);
+my $run_id = $dbh->last_insert_id();
 $dbh->commit;
 
 if ($skip) {
@@ -165,6 +166,7 @@ foreach my $entry (@{$json}) {
 	$cmd .= ' -Xclang -load -Xclang clang-struct.so';
 	$cmd .= ' -Xclang -analyzer-checker -Xclang jirislaby.StructMembersChecker';
 	$cmd .= " -Xclang -analyzer-config -Xclang jirislaby.StructMembersChecker:basePath=$basepath";
+	$cmd .= " -Xclang -analyzer-config -Xclang jirislaby.StructMembersChecker:runId=$run_id";
 	#print "$cmd\n";
 	exec($cmd);
 }

@@ -1,7 +1,6 @@
 module ApplicationHelper
-  def src_link_to(text, file, line = 0)
-    @rev = "v6.8"
-    @link = "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/#{file}?id=#{@rev}"
+  def src_link_to(text, ver, file, line = 0)
+    @link = "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/#{file}?id=#{ver}"
     if line > 0
       @link << "#n#{line}"
     end

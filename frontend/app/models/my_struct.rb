@@ -6,6 +6,7 @@ class MyStruct < ApplicationRecord
   end
   self.table_name = 'struct'
 
+  belongs_to :run, :foreign_key => 'run'
   has_many :member, -> { order('begLine, begCol') }, :foreign_key => 'struct'
   belongs_to :source, :foreign_key => 'src'
 

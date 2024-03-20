@@ -68,14 +68,15 @@ public:
 
 class MatchCallback : public MatchFinder::MatchCallback {
 public:
-	MatchCallback(SourceManager &SM, Connection &conn,
+	MatchCallback(SourceManager &SM, Connection &conn, int runId,
 		      std::filesystem::path &basePath) :
-		SM(SM), conn(conn), basePath(basePath) { }
+		SM(SM), conn(conn), runId(runId), basePath(basePath) { }
 
 	void run(const MatchFinder::MatchResult &res);
 private:
 	void bindLoc(Msg &msg, const SourceRange &SR);
 	std::string getSrc(const SourceLocation &SLOC);
+	void addRun(Msg &msg);
 	void addSrc(Msg &msg, const std::string &src);
 
 	void handleUse(const SourceRange &initSR, const NamedDecl *ND, const RecordDecl *RD,
@@ -93,6 +94,7 @@ private:
 	SourceManager &SM;
 
 	Connection &conn;
+	int runId;
 	std::filesystem::path &basePath;
 	std::set<const MemberExpr *> visited;
 	std::set<std::string> sources;
@@ -197,6 +199,14 @@ std::string MatchCallback::getSrc(const SourceLocation &SLOC)
 	return ret.string();
 }
 
+void MatchCallback::addRun(Msg &msg)
+{
+	if (runId >= 0)
+		msg.add("run", runId);
+	else
+		msg.add("run");
+}
+
 void MatchCallback::addSrc(Msg &msg, const std::string &src)
 {
 	if (!sources.insert(src).second)
@@ -204,6 +214,7 @@ void MatchCallback::addSrc(Msg &msg, const std::string &src)
 
 	msg.renew(Msg::KIND::SOURCE);
 
+	addRun(msg);
 	msg.add("src", src);
 	conn.write(msg);
 }
@@ -219,6 +230,7 @@ void MatchCallback::handleUse(const SourceRange &initSR, const NamedDecl *ND, co
 	addSrc(msg, useSrc);
 
 	msg.renew(Msg::KIND::USE);
+	addRun(msg);
 	msg.add("member", getNDName(ND));
 	msg.add("struct", getRDName(RD));
 	msg.add("strSrc", strSrc);
@@ -289,6 +301,7 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 	addSrc(msg, src);
 
 	msg.renew(Msg::KIND::STRUCT);
+	addRun(msg);
 	msg.add("name", RDName);
 
 	std::string type;
@@ -336,6 +349,7 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 				"." << f->getNameAsString() << "\n";*/
 		auto SR = f->getSourceRange();
 		msg.renew(Msg::KIND::MEMBER);
+		addRun(msg);
 		msg.add("name", getNDName(f));
 		msg.add("struct", RDName);
 		msg.add("src", src);
@@ -431,8 +445,9 @@ void MyChecker::checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
 
 	auto basePathStr = A.getAnalyzerOptions().getCheckerStringOption(this, "basePath");
 	std::filesystem::path basePath(basePathStr.str());
+	auto runId = A.getAnalyzerOptions().getCheckerIntegerOption(this, "runId");
 
-	MatchCallback CB(A.getSourceManager(), conn, basePath);
+	MatchCallback CB(A.getSourceManager(), conn, runId, basePath);
 
 	MatchFinder FRD;
 	FRD.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, recordDecl().bind("RD")),
@@ -468,6 +483,10 @@ extern "C" void clang_registerCheckers(CheckerRegistry &registry) {
   registry.addChecker<MyChecker>("jirislaby.StructMembersChecker",
 				 "Searches for unused struct members",
 				 "");
+  registry.addCheckerOption("int", "jirislaby.StructMembersChecker",
+			    "runId", "-1",
+			    "ID of the current run",
+			    "released");
   registry.addCheckerOption("string", "jirislaby.StructMembersChecker",
 			    "basePath", "",
 			    "Path to resolve file paths against (empty = absolute paths)",
