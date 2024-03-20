@@ -254,9 +254,9 @@ template <typename T>
 int SQLConn<T>::open()
 {
 	if (openDB() < 0)
-		return EXIT_FAILURE;
+		return -1;
 	if (prepDB() < 0)
-		return EXIT_FAILURE;
+		return -1;
 
 	return 0;
 }
