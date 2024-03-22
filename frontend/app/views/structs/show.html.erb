@@ -13,14 +13,8 @@
     <tbody>
       <% @members.each do |member| %>
         <tr id="et<%= member.id %>">
-          <td><%= link_to(member.name, struct_use_path(@struct, member)) %>
-            (<%= src_link_to('src', member.version, @struct.src_file,
-                             member.begLine) %>)
-                             <%if member.nested_id != nil %>
-                               <b>
-                               <%= link_to('-> continue to nested structure/union here', struct_path(member.nested_id)) %>
-                               </b>
-            <% end %>
+          <td><%= '&nbsp;'.html_safe * member.level * 8 %><%= link_to(member.name, struct_use_path(@struct, member)) %>
+            (<%= src_link_to('src', member.version, @struct.src_file, member.begLine) %>)
           </td>
           <td><%= member.begLine %></td>
           <td><%= member.begCol %></td>

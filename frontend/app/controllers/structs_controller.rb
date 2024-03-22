@@ -52,13 +52,16 @@ class StructsController < ApplicationController
 
   def show
     @struct = MyStruct.left_joins(:source).select('struct.*', 'source.src AS src_file').find(params[:id])
-    @members = Member.left_joins(:run).select('member.*', 'run.version',
-                             "(SELECT id FROM struct AS nested " <<
-                             "WHERE nested.src = #{@struct.src} AND " <<
-                             "member.begLine == nested.begLine AND " <<
-                             "member.begCol == nested.begCol LIMIT 1) " <<
-                             "AS nested_id").
-           where(struct: @struct).order('member.begLine')
+    base = Member.left_joins(:struct).select('member.id', 'member.struct', 'struct.src', 'member.begLine', 'member.begCol', '0').where(:struct => params[:id])
+    #recursive =
+    @members = Member.find_by_sql(<<SQL
+      WITH RECURSIVE nested(id, struct, src, begLine, begCol, level) AS (
+        #{base.to_sql}
+        UNION
+        SELECT member.id, member.struct, struct.src, member.begLine, member.begCol, level + 1 FROM nested INNER JOIN struct ON struct.src = nested.src AND struct.begLine = nested.begLine AND struct.begCol = nested.begCol LEFT JOIN member ON struct.id = member.struct)
+      SELECT level, run.version, member.*, member.struct AS struct_id FROM nested NATURAL JOIN member LEFT JOIN run ON member.run = run.id ORDER BY begLine, begCol;
+SQL
+    )
 
     respond_to do |format|
       format.html
