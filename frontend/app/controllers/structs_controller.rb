@@ -17,12 +17,10 @@ class StructsController < ApplicationController
       @structs = @structs.nopacked
     end
     unless params[:filter_struct].blank?
-      filter = "%#{params[:filter_struct]}%"
-      @structs = @structs.where('struct.name LIKE ?', filter)
+      @structs = @structs.where("struct.name LIKE ? ESCAPE '\\'", params[:filter_struct])
     end
     unless params[:filter_file].blank?
-      filter = "%#{params[:filter_file]}%"
-      @structs = @structs.where('source.src LIKE ?', filter)
+      @structs = @structs.where("source.src LIKE ? ESCAPE '\\'", params[:filter_file])
     end
     @structs = @structs.left_joins(:source)
     @structs = @structs.left_joins(:run)

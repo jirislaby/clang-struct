@@ -23,12 +23,10 @@ class MembersController < ApplicationController
       end
     end
     unless params[:filter_struct].blank?
-      filter = "%#{params[:filter_struct]}%"
-      @members = @members.where('struct.name LIKE ?', filter)
+      @members = @members.where("struct.name LIKE ? ESCAPE '\\'", params[:filter_struct])
     end
     unless params[:filter_member].blank?
-      filter = "%#{params[:filter_member]}%"
-      @members = @members.where('member.name LIKE ?', filter)
+      @members = @members.where("member.name LIKE ? ESCAPE '\\'", params[:filter_member])
     end
     if params[:noreserved] == '1'
       @members = @members.where('member.name NOT LIKE ? AND ' +
@@ -42,8 +40,7 @@ class MembersController < ApplicationController
                                 'compat_%', 'trace_event_raw_%')
     end
     unless params[:filter_file].blank?
-      filter = "%#{params[:filter_file]}%"
-      @members = @members.where('source.src LIKE ?', filter)
+      @members = @members.where("source.src LIKE ? ESCAPE '\\'", params[:filter_file])
     end
     @members = @members.left_joins({:struct => :source}).left_joins(:run)
     if params[:nopacked] == '1'

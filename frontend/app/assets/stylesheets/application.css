@@ -242,3 +242,10 @@ h1.main_title a:hover {
 	border-top-right-radius: 10px;
 }
 
+.code {
+	font-family: Monospace;
+	background-color: #d0d0d0;
+	padding-left: 3px;
+	padding-right: 3px;
+	border-radius: 4px;
+}

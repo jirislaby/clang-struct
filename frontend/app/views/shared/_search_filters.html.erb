@@ -11,6 +11,11 @@
       <%= form.text_field :filter_member, :name => 'filter_member', :value => params[:filter_member] %>
     <% end %>
     <br/>
+    <br/>
+    Filters are <b>SQL patterns</b>. I.e. use <span class="code">%</span> and <span class="code">_</span> as wildcards (corresponds to glob's <span class="code">*</span>, and <span class="code">?</span>, respectively), and <span class="code">\</span> as an escape character.<br/>
+    For example: <span class="code">%mm\_ty%</span> will return entries like <span class="code">…/mm_types.h</span>.
+    <br/>
+    <br/>
     <%= form.check_box :nopacked, :checked => params[:nopacked] == "1" %>
     <%= form.label :nopacked, "Exclude packed structures/unions" %><br/>
     <% if local_assigns[:members] %>
