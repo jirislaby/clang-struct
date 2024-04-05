@@ -6,7 +6,7 @@ class StructsController < ApplicationController
     end
 
     case params[:order]
-    when 'Struct'
+    when 'Struct/Union'
       order = 'struct.name ' + order_dir + ', src_file ' + order_dir
     else
       order = 'src_file ' + order_dir + ', struct.begLine ' + order_dir
