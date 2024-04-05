@@ -339,6 +339,7 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 	msg.add("type", type);
 	msg.add("attrs", ss.str());
 	msg.add("packed", packed);
+	msg.add("inMacro", RDSR.getBegin().isMacroID());
 	msg.add("src", src);
 	bindLoc(msg, RDSR);
 	conn.write(msg);

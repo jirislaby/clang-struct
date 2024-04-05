@@ -1,5 +1,9 @@
 #include "../test/trial.h"
 
+#define M struct in_macro { int x; }
+
+M;
+
 void modify_int(int *);
 
 struct X {

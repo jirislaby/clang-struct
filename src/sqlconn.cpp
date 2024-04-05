@@ -67,6 +67,7 @@ int SQLConn<T>::openDB()
 			"name TEXT NOT NULL, "
 			"attrs TEXT, "
 			"packed INTEGER NOT NULL CHECK(packed IN (0, 1)), "
+			"inMacro INTEGER NOT NULL CHECK(inMacro IN (0, 1)), "
 			"src INTEGER NOT NULL REFERENCES source(id) ON DELETE CASCADE, "
 			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL, "
 			"endLine INTEGER, endCol INTEGER, "
@@ -134,7 +135,7 @@ int SQLConn<T>::openDB()
 	static const std::vector<const char *> create_views {
 		"struct_view AS "
 			"SELECT struct.id, struct.run AS run, type, "
-				"struct.name AS struct, attrs, packed, source.src, "
+				"struct.name AS struct, attrs, packed, inMacro, source.src, "
 				"struct.begLine || ':' || struct.begCol || '-' || "
 				"struct.endLine || ':' || struct.endCol AS location "
 			"FROM struct LEFT JOIN source ON struct.src=source.id",
@@ -206,8 +207,8 @@ int SQLConn<T>::prepDB()
 
 	ret = sqlite3_prepare_v2(sqlHolder,
 				 "INSERT INTO "
-				 "struct(run, type, name, attrs, packed, src, begLine, begCol, endLine, endCol) "
-				 "SELECT :run, :type, :name, :attrs, :packed, id, :begLine, :begCol, :endLine, :endCol "
+				 "struct(run, type, name, attrs, packed, inMacro, src, begLine, begCol, endLine, endCol) "
+				 "SELECT :run, :type, :name, :attrs, :packed, :inMacro, id, :begLine, :begCol, :endLine, :endCol "
 					"FROM source WHERE src=:src;",
 				 -1, &stmt, NULL);
 	insStr.reset(stmt);

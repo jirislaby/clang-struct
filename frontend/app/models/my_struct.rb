@@ -10,5 +10,6 @@ class MyStruct < ApplicationRecord
   has_many :member, -> { order('begLine, begCol') }, :foreign_key => 'struct'
   belongs_to :source, :foreign_key => 'src'
 
+  scope :nomacro, -> { where(:inMacro => 0) }
   scope :nopacked, -> { where(:packed => 0) }
 end

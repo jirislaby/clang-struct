@@ -13,6 +13,9 @@ class StructsController < ApplicationController
     end
 
     @structs = MyStruct
+    if params[:nomacro] == '1'
+      @structs = @structs.nomacro
+    end
     if params[:nopacked] == '1'
       @structs = @structs.nopacked
     end
