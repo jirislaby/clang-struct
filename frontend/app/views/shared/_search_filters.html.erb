@@ -1,13 +1,13 @@
 <div class="search_line">
   <%= form_with method: :get do |form| %>
-    <%= form.label :filter_file, "Filter file path:" %>
+    <%= form.label :filter_file, "Filter <b>file path</b>:".html_safe %>
     <%= form.text_field :filter_file, :value => params[:filter_file] %>
     <span class="spacer"></span>
-    <%= form.label :filter_struct, "Filter struct/union:" %>
+    <%= form.label :filter_struct, "Filter <b>struct/union</b>:".html_safe %>
     <%= form.text_field :filter_struct, :name => 'filter_struct', :value => params[:filter_struct] %>
     <% if local_assigns[:members] %>
       <span class="spacer"></span>
-      <%= form.label :filter_member, "Filter member:" %>
+      <%= form.label :filter_member, "Filter <b>member</b>:".html_safe %>
       <%= form.text_field :filter_member, :name => 'filter_member', :value => params[:filter_member] %>
     <% end %>
     <br/>
@@ -17,16 +17,23 @@
     <br/>
     <br/>
     <%= form.check_box :nopacked, :checked => params[:nopacked] == "1" %>
-    <%= form.label :nopacked, "Exclude packed structures/unions" %><br/>
+    <%= form.label :nopacked, "Exclude <b>packed</b> structures/unions".html_safe %><br/>
     <%= form.check_box :nomacro, :checked => params[:nomacro] == "1" %>
-    <%= form.label :nomacro, "Exclude structures/unions declared in macros" %><br/>
+    <%= form.label :nomacro, "Exclude structures/unions <b>declared in macros</b>".html_safe %><br/>
     <% if local_assigns[:members] %>
       <%= form.check_box :noreserved, :checked => params[:noreserved] == "1" %>
-      <%= form.label :noreserved, "Exclude special members (structs/unions like compat_*, trace_event_* or members like *dummy*, *pad*, *reserved*, *unused*)" %><br/>
+      <%= form.label :noreserved, "Exclude <b>special members</b> (structs/unions like
+        <span class=\"code\">compat_*</span>,
+        <span class=\"code\">trace_event_*</span>
+        or members like
+        <span class=\"code\">*dummy*</span>,
+        <span class=\"code\">*pad*</span>,
+        <span class=\"code\">*reserved*</span>,
+        <span class=\"code\">unused*</span>)".html_safe %><br/>
       <%= form.check_box :noimplicit, :checked => params[:noimplicit] == "1" %>
-      <%= form.label :noimplicit, "Exclude implicit initialization (list members not explicitly mentioned in initializers)" %><br/>
+      <%= form.label :noimplicit, "Exclude <b>implicit initialization</b> (list members not explicitly mentioned in initializers)".html_safe %><br/>
       <%= form.check_box :unused, :checked => params[:unused] == "1" %>
-      <%= form.label :unused, "Unused members only" %><br/>
+      <%= form.label :unused, "<b>Unused</b> members only".html_safe %><br/>
     <% end %>
     <%= form.submit 'Submit' %>
   <% end %>
