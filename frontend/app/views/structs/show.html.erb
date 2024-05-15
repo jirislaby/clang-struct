@@ -8,6 +8,10 @@
         <th>Member</th>
         <th>Line</th>
         <th>Column</th>
+        <th>Uses</th>
+        <th>Loads</th>
+        <th>Stores</th>
+        <th>Implicit Uses</th>
       </tr>
     </thead>
     <tbody>
@@ -18,6 +22,10 @@
           </td>
           <td><%= member.begLine %></td>
           <td><%= member.begCol %></td>
+          <td><%= member.uses %></td>
+          <td><%= member.loads %></td>
+          <td><%= member.stores %></td>
+          <td><%= member.implicit_uses %></td>
         </tr>
       <% end %>
     </tbody>

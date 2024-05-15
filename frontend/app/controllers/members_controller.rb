@@ -10,6 +10,8 @@ class MembersController < ApplicationController
       order = 'member.name ' + order_dir + ', struct.name ' + order_dir
     when 'File'
       order = 'src_file ' + order_dir + ', member.begLine ' + order_dir
+    when 'Uses'
+      order = 'member.uses ' + order_dir + ', member.name ' + order_dir
     else
       order = 'struct.name ' + order_dir + ', member.begLine ' + order_dir
     end
