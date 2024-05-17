@@ -159,6 +159,7 @@ foreach my $entry (@{$json}) {
 	chdir $entry->{'directory'} or die "cannot cd to $entry->{'directory'}";
 
 	my $cmd = $entry->{'command'};
+	$cmd =~ s/\bccache\s+//;
 	$cmd =~ s/\s+-W[^\s]+//g;
 	$cmd =~ s/\s+-c\b//;
 	$cmd =~ s@\s+-o\s*[^\s]+@ -o /dev/null@;
