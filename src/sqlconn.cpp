@@ -18,6 +18,15 @@ static int busy_handler(void *data, int count)
 	return 1;
 }
 
+void joinVec(std::ostringstream &ss, const std::vector<const char *> vec, const std::string &sep = ", ")
+{
+	for (auto i = vec.begin(), end = vec.end(); i != end; ++i) {
+		ss << *i;
+		if (i != end - 1)
+			ss << sep;
+	}
+}
+
 template <typename T>
 int SQLConn<T>::openDB()
 {
@@ -50,62 +59,74 @@ int SQLConn<T>::openDB()
 		return -1;
 	}
 
-	static const std::vector<const char *> create_tables {
-		"run(id INTEGER PRIMARY KEY, "
-			"version TEXT, "
-			"sha TEXT, "
-			"filter TEXT, "
-			"skip INTEGER NOT NULL CHECK(skip IN (0, 1)), "
-			"timestamp TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW', 'localtime')))",
-		"source(id INTEGER PRIMARY KEY, "
-			"run INTEGER REFERENCES run(id), "
-			"src TEXT NOT NULL UNIQUE)",
-		"struct(id INTEGER PRIMARY KEY, "
-			"run INTEGER REFERENCES run(id), "
-			"parent INTEGER REFERENCES struct(id) ON DELETE CASCADE, "
-			"type TEXT NOT NULL CHECK(type IN ('s', 'u')), "
-			"name TEXT NOT NULL, "
-			"attrs TEXT, "
-			"packed INTEGER NOT NULL CHECK(packed IN (0, 1)), "
-			"inMacro INTEGER NOT NULL CHECK(inMacro IN (0, 1)), "
-			"src INTEGER NOT NULL REFERENCES source(id) ON DELETE CASCADE, "
-			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL, "
-			"endLine INTEGER, endCol INTEGER, "
-			"UNIQUE(name, src, begLine, begCol))",
-		"member(id INTEGER PRIMARY KEY, "
-			"run INTEGER REFERENCES run(id), "
-			"name TEXT NOT NULL, "
-			"struct INTEGER NOT NULL REFERENCES struct(id) ON DELETE CASCADE, "
-			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL, "
-			"endLine INTEGER, endCol INTEGER, "
-			"uses INTEGER NOT NULL DEFAULT 0, "
-			"loads INTEGER NOT NULL DEFAULT 0, "
-			"stores INTEGER NOT NULL DEFAULT 0, "
-			"implicit_uses INTEGER NOT NULL DEFAULT 0, "
-			"UNIQUE(struct, name, begLine, begCol), "
-			"CHECK(endLine >= begLine), "
-			"CHECK(uses >= loads + stores), "
-			"CHECK(uses >= implicit_uses))",
-		"use(id INTEGER PRIMARY KEY, "
-			"run INTEGER REFERENCES run(id), "
-			"member INTEGER NOT NULL REFERENCES member(id) ON DELETE CASCADE, "
-			"src INTEGER NOT NULL REFERENCES source(id) ON DELETE CASCADE, "
-			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL, "
-			"endLine INTEGER, endCol INTEGER, "
-			"load INTEGER CHECK(load IN (0, 1)), "
-			"implicit INTEGER NOT NULL CHECK(implicit IN (0, 1)), "
-			"UNIQUE(member, src, begLine), "
-			"CHECK(endLine >= begLine))"
+	static const std::vector<std::pair<const char *, std::vector<const char *>>> create_tables {
+		{ "run", {
+			"id INTEGER PRIMARY KEY",
+			"version TEXT",
+			"sha TEXT",
+			"filter TEXT",
+			"skip INTEGER NOT NULL CHECK(skip IN (0, 1))",
+			"timestamp TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW', 'localtime'))",
+		}},
+		{ "source", {
+			"id INTEGER PRIMARY KEY",
+			"run INTEGER REFERENCES run(id)",
+			"src TEXT NOT NULL UNIQUE",
+		}},
+		{ "struct", {
+			"id INTEGER PRIMARY KEY",
+			"run INTEGER REFERENCES run(id)",
+			"parent INTEGER REFERENCES struct(id) ON DELETE CASCADE",
+			"type TEXT NOT NULL CHECK(type IN ('s', 'u'))",
+			"name TEXT NOT NULL",
+			"attrs TEXT",
+			"packed INTEGER NOT NULL CHECK(packed IN (0, 1))",
+			"inMacro INTEGER NOT NULL CHECK(inMacro IN (0, 1))",
+			"src INTEGER NOT NULL REFERENCES source(id) ON DELETE CASCADE",
+			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL",
+			"endLine INTEGER, endCol INTEGER",
+			"UNIQUE(name, src, begLine, begCol)",
+		}},
+		{ "member", {
+			"id INTEGER PRIMARY KEY",
+			"run INTEGER REFERENCES run(id)",
+			"name TEXT NOT NULL",
+			"struct INTEGER NOT NULL REFERENCES struct(id) ON DELETE CASCADE",
+			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL",
+			"endLine INTEGER, endCol INTEGER",
+			"uses INTEGER NOT NULL DEFAULT 0",
+			"loads INTEGER NOT NULL DEFAULT 0",
+			"stores INTEGER NOT NULL DEFAULT 0",
+			"implicit_uses INTEGER NOT NULL DEFAULT 0",
+			"UNIQUE(struct, name, begLine, begCol)",
+			"CHECK(endLine >= begLine)",
+			"CHECK(uses >= loads + stores)",
+			"CHECK(uses >= implicit_uses)",
+		}},
+		{ "use", {
+			"id INTEGER PRIMARY KEY",
+			"run INTEGER REFERENCES run(id)",
+			"member INTEGER NOT NULL REFERENCES member(id) ON DELETE CASCADE",
+			"src INTEGER NOT NULL REFERENCES source(id) ON DELETE CASCADE",
+			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL",
+			"endLine INTEGER, endCol INTEGER",
+			"load INTEGER CHECK(load IN (0, 1))",
+			"implicit INTEGER NOT NULL CHECK(implicit IN (0, 1))",
+			"UNIQUE(member, src, begLine)",
+			"CHECK(endLine >= begLine)",
+		}},
 	};
 
 	for (auto c: create_tables) {
-		std::string s("CREATE TABLE IF NOT EXISTS ");
-		s.append(c).append(" STRICT;");
-		ret = sqlite3_exec(sqlHolder, s.c_str(), NULL, NULL, &err);
+		std::ostringstream ss;
+		ss << "CREATE TABLE IF NOT EXISTS " << c.first << '(';
+		joinVec(ss, c.second);
+		ss << ") STRICT;";
+		ret = sqlite3_exec(sqlHolder, ss.str().c_str(), NULL, NULL, &err);
 		if (ret != SQLITE_OK) {
 			std::cerr << "db CREATE failed (" << __LINE__ << "): " <<
 					sqlite3_errstr(ret) << " -> " <<
-					err << "\n\t" << s << "\n";
+					err << "\n\t" << ss.str() << "\n";
 			sqlite3_free(err);
 			return -1;
 		}
@@ -132,14 +153,15 @@ int SQLConn<T>::openDB()
 		}
 	}
 
-	static const std::vector<const char *> create_views {
-		"struct_view AS "
+	static const std::vector<std::pair<const char *, const char *>> create_views {
+		{ "struct_view",
 			"SELECT struct.id, struct.run AS run, type, "
 				"struct.name AS struct, attrs, packed, inMacro, source.src, "
 				"struct.begLine || ':' || struct.begCol || '-' || "
 				"struct.endLine || ':' || struct.endCol AS location "
-			"FROM struct LEFT JOIN source ON struct.src=source.id",
-		"member_view AS "
+			"FROM struct LEFT JOIN source ON struct.src=source.id"
+		},
+		{ "member_view",
 			"SELECT member.id, member.run AS run, struct.name AS struct, struct.attrs, "
 				"member.name AS member, source.src, "
 				"member.begLine || ':' || member.begCol || '-' || "
@@ -147,8 +169,9 @@ int SQLConn<T>::openDB()
 				"uses, loads, stores, implicit_uses "
 			"FROM member "
 			"LEFT JOIN struct ON member.struct=struct.id "
-			"LEFT JOIN source ON struct.src=source.id",
-		"use_view AS "
+			"LEFT JOIN source ON struct.src=source.id"
+		},
+		{ "use_view",
 			"SELECT use.id, use.run AS run, struct.name AS struct, struct.attrs, "
 				"member.name AS member, source.src, "
 				"use.begLine || ':' || use.begCol || '-' || "
@@ -156,8 +179,9 @@ int SQLConn<T>::openDB()
 			"FROM use "
 			"LEFT JOIN member ON use.member=member.id "
 			"LEFT JOIN struct ON member.struct=struct.id "
-			"LEFT JOIN source ON use.src=source.id",
-		"unused_view AS "
+			"LEFT JOIN source ON use.src=source.id"
+		},
+		{ "unused_view",
 			"SELECT member.run AS run, struct.name AS struct, struct.attrs, "
 				"member.name AS member, source.src, "
 				"member.begLine || ':' || member.begCol || '-' || "
@@ -167,12 +191,13 @@ int SQLConn<T>::openDB()
 			"LEFT JOIN source ON struct.src=source.id "
 			"WHERE member.id NOT IN (SELECT member FROM use) "
 				"AND struct.name != '<anonymous>' AND struct.name != '<unnamed>' "
-				"AND member.name != '<unnamed>'",
+				"AND member.name != '<unnamed>'"
+		},
 	};
 
 	for (auto c: create_views) {
 		std::string s("CREATE VIEW IF NOT EXISTS ");
-		s.append(c);
+		s.append(c.first).append(" AS ").append(c.second);
 		ret = sqlite3_exec(sqlHolder, s.c_str(), NULL, NULL, &err);
 		if (ret != SQLITE_OK) {
 			std::cerr << "db CREATE failed (" << __LINE__ << "): " <<
