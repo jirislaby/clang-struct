@@ -1,3 +1,16 @@
+#define expand(n, MEMBERS...) \
+        union { \
+                struct { MEMBERS }; \
+                struct { MEMBERS } named; \
+        }
+
+struct X {
+	expand(x,
+	    int a;
+	);
+};
+
+#if 0
 #include "../test/trial.h"
 
 #define M struct in_macro { int x; }
@@ -45,3 +58,4 @@ void fun3(struct X *x)
 	modify_int(&x->used_ptr);
 }
 
+#endif
