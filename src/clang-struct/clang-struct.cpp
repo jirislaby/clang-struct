@@ -69,9 +69,9 @@ public:
 
 class MatchCallback : public MatchFinder::MatchCallback {
 public:
-	MatchCallback(SourceManager &SM, Connection &conn, int runId,
+	MatchCallback(ASTContext &AST, SourceManager &SM, Connection &conn, int runId,
 		      std::filesystem::path &basePath) :
-		SM(SM), conn(conn), runId(runId), basePath(basePath) { }
+		/*AST(AST),*/ SM(SM), conn(conn), runId(runId), basePath(basePath) { }
 
 	void run(const MatchFinder::MatchResult &res);
 private:
@@ -92,6 +92,7 @@ private:
 	static std::string getNDName(const NamedDecl *ND);
 	static std::string getRDName(const RecordDecl *RD);
 
+	//ASTContext &AST;
 	SourceManager &SM;
 
 	Connection &conn;
@@ -358,6 +359,18 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 		msg.add("strBegLine", SM.getPresumedLineNumber(RDSR.getBegin()));
 		msg.add("strBegCol", SM.getPresumedColumnNumber(RDSR.getBegin()));
 
+#if 0
+		/* child */
+		if (auto RT = dyn_cast<RecordType>(f->getType().getDesugaredType(AST))) {
+			RT->dump();
+			auto mRD = RT->getDecl();
+			mRD->dumpColor();
+			auto idx = RDIdx.find(mRD);
+			assert(idx != RDIdx.end());
+			llvm::errs() << "idx=" << idx->second << "\n";
+		}
+#endif
+
 		bindLoc(msg, SR);
 		conn.write(msg);
 	}
@@ -450,7 +463,7 @@ void MyChecker::checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
 	std::filesystem::path basePath(basePathStr.str());
 	auto runId = A.getAnalyzerOptions().getCheckerIntegerOption(this, "runId");
 
-	MatchCallback CB(A.getSourceManager(), conn, runId, basePath);
+	MatchCallback CB(A.getASTContext(), A.getSourceManager(), conn, runId, basePath);
 
 	MatchFinder FRD;
 	FRD.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, recordDecl().bind("RD")),

@@ -90,6 +90,7 @@ int SQLConn<T>::openDB(const std::string &dbFile)
 		{ "member", {
 			"id INTEGER PRIMARY KEY",
 			"run INTEGER REFERENCES run(id)",
+			"child INTEGER REFERENCES struct(id) ON DELETE CASCADE",
 			"name TEXT NOT NULL",
 			"struct INTEGER NOT NULL REFERENCES struct(id) ON DELETE CASCADE",
 			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL",
@@ -232,8 +233,8 @@ int SQLConn<T>::prepDB()
 
 	ret = sqlite3_prepare_v2(sqlHolder,
 				 "INSERT INTO "
-				 "struct(run, type, name, attrs, packed, inMacro, src, begLine, begCol, endLine, endCol) "
-				 "SELECT :run, :type, :name, :attrs, :packed, :inMacro, id, :begLine, :begCol, :endLine, :endCol "
+				 "struct(run, parent, type, name, attrs, packed, inMacro, src, begLine, begCol, endLine, endCol) "
+				 "SELECT :run, :parent, :type, :name, :attrs, :packed, :inMacro, id, :begLine, :begCol, :endLine, :endCol "
 					"FROM source WHERE src=:src;",
 				 -1, &stmt, NULL);
 	insStr.reset(stmt);
@@ -246,8 +247,8 @@ int SQLConn<T>::prepDB()
 
 	ret = sqlite3_prepare_v2(sqlHolder,
 				 "INSERT INTO "
-				 "member(run, name, struct, begLine, begCol, endLine, endCol) "
-				 "SELECT :run, :name, struct.id, :begLine, :begCol, :endLine, :endCol "
+				 "member(run, child, name, struct, begLine, begCol, endLine, endCol) "
+				 "SELECT :run, :child, :name, struct.id, :begLine, :begCol, :endLine, :endCol "
 					"FROM struct LEFT JOIN source ON struct.src=source.id "
 					"WHERE source.src=:src AND "
 					"begLine=:strBegLine AND begCol=:strBegCol AND "
