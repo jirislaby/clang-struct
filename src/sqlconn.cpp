@@ -83,9 +83,10 @@ int SQLConn<T>::openDB(const std::string &dbFile)
 			"packed INTEGER NOT NULL CHECK(packed IN (0, 1))",
 			"inMacro INTEGER NOT NULL CHECK(inMacro IN (0, 1))",
 			"src INTEGER NOT NULL REFERENCES source(id) ON DELETE CASCADE",
+			"srcIdx INTEGER NOT NULL",
 			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL",
 			"endLine INTEGER, endCol INTEGER",
-			"UNIQUE(name, src, begLine, begCol)",
+			"UNIQUE(src, srcIdx)",
 		}},
 		{ "member", {
 			"id INTEGER PRIMARY KEY",
@@ -157,6 +158,7 @@ int SQLConn<T>::openDB(const std::string &dbFile)
 		{ "struct_view",
 			"SELECT struct.id, struct.run AS run, type, "
 				"struct.name AS struct, attrs, packed, inMacro, source.src, "
+				"srcIdx, "
 				"struct.begLine || ':' || struct.begCol || '-' || "
 				"struct.endLine || ':' || struct.endCol AS location "
 			"FROM struct LEFT JOIN source ON struct.src=source.id"
@@ -232,8 +234,8 @@ int SQLConn<T>::prepDB()
 
 	ret = sqlite3_prepare_v2(sqlHolder,
 				 "INSERT INTO "
-				 "struct(run, type, name, attrs, packed, inMacro, src, begLine, begCol, endLine, endCol) "
-				 "SELECT :run, :type, :name, :attrs, :packed, :inMacro, id, :begLine, :begCol, :endLine, :endCol "
+				 "struct(run, type, name, attrs, packed, inMacro, src, srcIdx, begLine, begCol, endLine, endCol) "
+				 "SELECT :run, :type, :name, :attrs, :packed, :inMacro, id, :srcIdx, :begLine, :begCol, :endLine, :endCol "
 					"FROM source WHERE src=:src;",
 				 -1, &stmt, NULL);
 	insStr.reset(stmt);
@@ -250,8 +252,7 @@ int SQLConn<T>::prepDB()
 				 "SELECT :run, :name, struct.id, :begLine, :begCol, :endLine, :endCol "
 					"FROM struct LEFT JOIN source ON struct.src=source.id "
 					"WHERE source.src=:src AND "
-					"begLine=:strBegLine AND begCol=:strBegCol AND "
-					"name=:struct;",
+					"struct.srcIdx=:srcIdx;",
 				 -1, &stmt, NULL);
 	insMem.reset(stmt);
 	if (ret != SQLITE_OK) {
@@ -268,10 +269,8 @@ int SQLConn<T>::prepDB()
 						"LEFT JOIN struct ON member.struct=struct.id "
 						"LEFT JOIN source ON struct.src=source.id "
 						"WHERE member.name=:member AND "
-						"struct.name=:struct AND "
 						"source.src=:strSrc AND "
-						"struct.begLine=:strLine AND "
-						"struct.begCol=:strCol), "
+						"struct.srcIdx=:srcIdx), "
 					"(SELECT id FROM source WHERE src=:use_src), "
 					":begLine, :begCol, :endLine, :endCol, :load, :implicit;",
 				 -1, &stmt, NULL);

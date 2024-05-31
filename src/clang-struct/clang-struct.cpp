@@ -1,4 +1,5 @@
 #include <filesystem>
+#include <map>
 #include <set>
 
 #include "clang/ASTMatchers/ASTMatchFinder.h"
@@ -99,6 +100,8 @@ private:
 	std::filesystem::path &basePath;
 	std::set<const MemberExpr *> visited;
 	std::set<std::string> sources;
+	std::map<std::string, int> srcIdx;
+	std::map<const RecordDecl *, int> RDIdx;
 };
 
 }
@@ -233,10 +236,10 @@ void MatchCallback::handleUse(const SourceRange &initSR, const NamedDecl *ND, co
 	msg.renew(Msg::KIND::USE);
 	addRun(msg);
 	msg.add("member", getNDName(ND));
-	msg.add("struct", getRDName(RD));
 	msg.add("strSrc", strSrc);
-	msg.add("strLine", SM.getPresumedLineNumber(strLoc));
-	msg.add("strCol", SM.getPresumedColumnNumber(strLoc));
+	auto idx = RDIdx.find(RD);
+	assert(idx != RDIdx.end());
+	msg.add("srcIdx", idx->second);
 	msg.add("use_src", useSrc);
 	if (load < 0)
 		msg.add("load");
@@ -342,6 +345,9 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 	msg.add("packed", packed);
 	msg.add("inMacro", RDSR.getBegin().isMacroID());
 	msg.add("src", src);
+	auto idx = srcIdx[src]++;
+	RDIdx[RD] = idx;
+	msg.add("srcIdx", idx);
 	bindLoc(msg, RDSR);
 	conn.write(msg);
 
@@ -353,10 +359,8 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 		msg.renew(Msg::KIND::MEMBER);
 		addRun(msg);
 		msg.add("name", getNDName(f));
-		msg.add("struct", RDName);
 		msg.add("src", src);
-		msg.add("strBegLine", SM.getPresumedLineNumber(RDSR.getBegin()));
-		msg.add("strBegCol", SM.getPresumedColumnNumber(RDSR.getBegin()));
+		msg.add("srcIdx", idx);
 
 		bindLoc(msg, SR);
 		conn.write(msg);
