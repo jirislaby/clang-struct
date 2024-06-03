@@ -1,0 +1,63 @@
+#!/usr/bin/bash
+
+set -e
+
+OLD="$1"
+NEW="$2"
+
+function getSTR()
+{
+	PREFIX="$1"
+	cat <<EOF
+SELECT source.src AS src, struct.name,
+	struct.begLine, struct.begCol
+	FROM ${PREFIX}struct
+	LEFT JOIN ${PREFIX}source ON source.id = struct.src
+EOF
+}
+
+function getMEMB()
+{
+	PREFIX="$1"
+	cat <<EOF
+SELECT source.src AS src, struct.name || '.' || member.name AS name,
+	member.begLine, member.begCol
+	FROM ${PREFIX}member
+	LEFT JOIN ${PREFIX}struct ON struct.id = member.struct
+	LEFT JOIN ${PREFIX}source ON source.id = struct.src
+EOF
+}
+
+function getUSES()
+{
+	PREFIX="$1"
+	cat <<EOF
+SELECT source.src AS src, struct.name || '.' || member.name AS name,
+	use.begLine, use.begCol
+	FROM ${PREFIX}use
+	LEFT JOIN ${PREFIX}member ON member.id = use.member
+	LEFT JOIN ${PREFIX}struct ON struct.id = member.struct
+	LEFT JOIN ${PREFIX}source ON source.id = struct.src
+EOF
+}
+
+declare -a CMDLINE=(sqlite3 -batch -box)
+
+"${CMDLINE[@]}" "${OLD}" "
+	ATTACH '${NEW}' AS new;
+	SELECT 'Missing structs (limit 10000)';
+	`getSTR`
+	EXCEPT
+	`getSTR new.`
+	ORDER BY src, name LIMIT 10000;
+	SELECT 'Missing members (limit 10000)';
+	`getMEMB`
+	EXCEPT
+	`getMEMB new.`
+	ORDER BY src, name, member.begLine, member.begCol LIMIT 10000;
+	SELECT 'Missing uses (limit 10000)';
+	`getUSES`
+	EXCEPT
+	`getUSES new.`
+	ORDER BY src, name, use.begLine, use.begCol LIMIT 10000;
+"
