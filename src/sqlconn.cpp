@@ -28,13 +28,13 @@ void joinVec(std::ostringstream &ss, const std::vector<const char *> vec, const 
 }
 
 template <typename T>
-int SQLConn<T>::openDB()
+int SQLConn<T>::openDB(const std::string &dbFile)
 {
 	sqlite3 *sql;
 	char *err;
 	int ret;
 
-	ret = sqlite3_open_v2("structs.db", &sql, SQLITE_OPEN_READWRITE |
+	ret = sqlite3_open_v2(dbFile.c_str(), &sql, SQLITE_OPEN_READWRITE |
 			      SQLITE_OPEN_CREATE, NULL);
 	sqlHolder.reset(sql);
 	if (ret != SQLITE_OK) {
@@ -287,9 +287,9 @@ int SQLConn<T>::prepDB()
 }
 
 template <typename T>
-int SQLConn<T>::open()
+int SQLConn<T>::open(const std::string &dbFile)
 {
-	if (openDB() < 0)
+	if (openDB(dbFile) < 0)
 		return -1;
 	if (prepDB() < 0)
 		return -1;

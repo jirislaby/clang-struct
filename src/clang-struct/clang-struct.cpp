@@ -33,12 +33,13 @@ public:
 #ifdef STANDALONE
 class SQLConnection : public Connection {
 public:
-	SQLConnection() : Connection() {}
+	SQLConnection(const std::string &dbFile) : Connection(), dbFile(dbFile) {}
 
 	virtual int open();
 	virtual void write(const Msg &msg);
 
 private:
+	const std::string dbFile;
 	SQLConn<std::string> sql;
 };
 #else
@@ -105,7 +106,7 @@ private:
 #ifdef STANDALONE
 int SQLConnection::open()
 {
-	return sql.open();
+	return sql.open(dbFile);
 }
 
 void SQLConnection::write(const Msg &msg)
@@ -434,7 +435,8 @@ void MyChecker::checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
 					  BugReporter &BR) const
 {
 #ifdef STANDALONE
-	SQLConnection conn;
+	auto dbFile = A.getAnalyzerOptions().getCheckerStringOption(this, "dbFile");
+	SQLConnection conn(dbFile.str());
 #else
 	MQConnection conn;
 #endif
@@ -492,6 +494,12 @@ extern "C" void clang_registerCheckers(CheckerRegistry &registry) {
 			    "basePath", "",
 			    "Path to resolve file paths against (empty = absolute paths)",
 			    "released");
+#ifdef STANDALONE
+  registry.addCheckerOption("string", "jirislaby.StructMembersChecker",
+			    "dbFile", "structs.db",
+			    "Name of the database file to store into",
+			    "released");
+#endif
 }
 
 extern "C" const char clang_analyzerAPIVersionString[] =

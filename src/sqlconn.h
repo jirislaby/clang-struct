@@ -11,14 +11,14 @@ public:
 
 	SQLConn() {}
 
-	int open();
+	int open(const std::string &dbFile = "structs.db");
 
 	int begin();
 	int end();
 
 	int handleMessage(const Msg &msg);
 private:
-	int openDB();
+	int openDB(const std::string &dbFile);
 	int prepDB();
 
 	int bindAndStep(SQLStmtHolder &ins, const Msg &msg);
