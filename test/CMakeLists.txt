@@ -3,7 +3,14 @@ list(APPEND test_files
 	packed.c
 )
 
-set(LLVM_OPTIONAL_SOURCES ${test_files} trial.c trial.h)
+set(LLVM_OPTIONAL_SOURCES ${test_files}
+	macro-cond.h
+	macro-cond1.c
+	macro-cond2.c
+	macro-expand.c
+	trial.h
+	trial.c
+)
 
 foreach(test_file IN LISTS test_files)
 	add_test(NAME ${test_file}
