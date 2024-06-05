@@ -1,6 +1,7 @@
 #include <filesystem>
 #include <set>
 
+#include "clang/Index/USRGeneration.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
 #include "clang/StaticAnalyzer/Core/Checker.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/AnalysisManager.h"
@@ -350,8 +351,12 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 		/*llvm::errs() << __func__ << ": " << RD->getNameAsString() <<
 				"." << f->getNameAsString() << "\n";*/
 		auto SR = f->getSourceRange();
+		llvm::SmallString<16> USR;
+		auto USRvalid = !index::generateUSRForDecl(f, USR);
 		msg.renew(Msg::KIND::MEMBER);
 		addRun(msg);
+		msg.add("USR", static_cast<std::string>(USR));
+		msg.add("USRvalid", USRvalid);
 		msg.add("name", getNDName(f));
 		msg.add("struct", RDName);
 		msg.add("src", src);

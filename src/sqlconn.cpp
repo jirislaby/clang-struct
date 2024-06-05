@@ -91,6 +91,8 @@ int SQLConn<T>::openDB(const std::string &dbFile)
 			"id INTEGER PRIMARY KEY",
 			"run INTEGER REFERENCES run(id)",
 			"name TEXT NOT NULL",
+			"USR TEXT NOT NULL",
+			"USRvalid INTEGER NOT NULL CHECK(USRvalid IN (0, 1))",
 			"struct INTEGER NOT NULL REFERENCES struct(id) ON DELETE CASCADE",
 			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL",
 			"endLine INTEGER, endCol INTEGER",
@@ -246,8 +248,8 @@ int SQLConn<T>::prepDB()
 
 	ret = sqlite3_prepare_v2(sqlHolder,
 				 "INSERT INTO "
-				 "member(run, name, struct, begLine, begCol, endLine, endCol) "
-				 "SELECT :run, :name, struct.id, :begLine, :begCol, :endLine, :endCol "
+				 "member(run, name, USR, USRvalid, struct, begLine, begCol, endLine, endCol) "
+				 "SELECT :run, :name, :USR, :USRvalid, struct.id, :begLine, :begCol, :endLine, :endCol "
 					"FROM struct LEFT JOIN source ON struct.src=source.id "
 					"WHERE source.src=:src AND "
 					"begLine=:strBegLine AND begCol=:strBegCol AND "
