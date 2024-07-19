@@ -15,12 +15,14 @@ use Parallel::ForkManager;
 my $basepath = "";
 my $dbfile = 'structs.db';
 my $filter;
+my $run_id;
 my $silent = 0;
 my $skip = 0;
 my $verbose = 0;
 GetOptions(
 	"basepath=s"	=> \$basepath,
 	"filter=s"	=> \$filter,
+	"run=i"		=> \$run_id,
 	"silent+"	=> \$silent,
 	"skip"		=> \$skip,
 	"verbose+"	=> \$verbose)
@@ -34,21 +36,6 @@ my $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile", undef, undef,
 
 $dbh->do('CREATE TABLE IF NOT EXISTS config(id INTEGER PRIMARY KEY, sha TEXT UNIQUE, config TEXT) STRICT;') ||
 	die "cannot CREATE TABLE config";
-
-my $config = "";
-open(my $config_f, "<.config") or die "cannot read .config";
-while (<$config_f>) {
-	next if /^#/;
-	next if /^$/;
-	$config .= $_;
-}
-close $config_f;
-
-my $config_sha = sha1_hex($config);
-my $ins = $dbh->prepare('INSERT INTO config(sha, config) VALUES (?, ?)') || die "cannot prepare";
-$ins->{PrintError} = 0;
-$ins->execute($config_sha, $config) or $ins->err == SQLITE_CONSTRAINT_UNIQUE or die $dbh->errstr;
-
 $dbh->do(<<'EOF'
 CREATE TABLE IF NOT EXISTS run(
 	id INTEGER PRIMARY KEY,
@@ -62,32 +49,50 @@ CREATE TABLE IF NOT EXISTS run(
 EOF
 ) || die "cannot CREATE TABLE run";
 
-my $sha;
-my $version;
-foreach my $srctree (qw|. source|) {
-	next unless (-d "$srctree/.git");
+if (defined $run_id) {
+	$dbh->selectrow_hashref('SELECT id FROM run WHERE id = ?', undef, $run_id) or die "no such run_id: $run_id";
+} else {
+	my $config = "";
+	open(my $config_f, "<.config") or die "cannot read .config";
+	while (<$config_f>) {
+		next if /^#/;
+		next if /^$/;
+		$config .= $_;
+	}
+	close $config_f;
 
-	my $repo = Git->repository(Directory => "$srctree/.git");
-	try {
-		$sha = $repo->command_oneline([ 'rev-parse', '--verify', 'HEAD' ], STDERR => 0);
-		$sha = substr($sha, 0, 12);
-	} catch Git::Error::Command with {
-	};
-	try {
-		$version = $repo->command_oneline([ 'describe', '--contains',
-			'--exact-match', 'HEAD'], STDERR => 0);
-		$version =~ s/\^0$//;
-	} catch Git::Error::Command with {
-	};
-	last;
+	my $config_sha = sha1_hex($config);
+	my $ins = $dbh->prepare('INSERT INTO config(sha, config) VALUES (?, ?)') || die "cannot prepare";
+	$ins->{PrintError} = 0;
+	$ins->execute($config_sha, $config) or $ins->err == SQLITE_CONSTRAINT_UNIQUE or die $dbh->errstr;
+
+	my $sha;
+	my $version;
+	foreach my $srctree (qw|. source|) {
+		next unless (-d "$srctree/.git");
+
+		my $repo = Git->repository(Directory => "$srctree/.git");
+		try {
+			$sha = $repo->command_oneline([ 'rev-parse', '--verify', 'HEAD' ], STDERR => 0);
+			$sha = substr($sha, 0, 12);
+		} catch Git::Error::Command with {
+		};
+		try {
+			$version = $repo->command_oneline([ 'describe', '--contains',
+				'--exact-match', 'HEAD'], STDERR => 0);
+			$version =~ s/\^0$//;
+		} catch Git::Error::Command with {
+		};
+		last;
+	}
+
+
+	$ins = $dbh->prepare('INSERT INTO run(version, sha, filter, config, skip) ' .
+		'SELECT ?, ?, ?, id, ? FROM config WHERE sha = ?') || die "cannot prepare";
+	$ins->execute($version, $sha, $filter, $skip, $config_sha);
+	$run_id = $dbh->last_insert_id();
+	$dbh->commit;
 }
-
-
-$ins = $dbh->prepare('INSERT INTO run(version, sha, filter, config, skip) ' .
-	'SELECT ?, ?, ?, id, ? FROM config WHERE sha = ?') || die "cannot prepare";
-$ins->execute($version, $sha, $filter, $skip, $config_sha);
-my $run_id = $dbh->last_insert_id();
-$dbh->commit;
 
 if ($skip) {
 	%skip_files = map {
