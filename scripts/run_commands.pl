@@ -1,7 +1,9 @@
 #!/usr/bin/perl
 use strict;
 use warnings;
+use Digest::SHA qw(sha1_hex);
 use DBI;
+use DBD::SQLite::Constants qw(SQLITE_CONSTRAINT_UNIQUE);
 use Cwd 'abs_path';
 use Error qw(:try);
 use File::Spec;
@@ -27,8 +29,25 @@ or die("Error in command line arguments\n");
 my %skip_files;
 
 my $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile", undef, undef,
-	{ AutoCommit => 0 }) ||
+	{ AutoCommit => 0, sqlite_extended_result_codes	=> 1 }) ||
 	die "connect to db error: " . DBI::errstr;
+
+$dbh->do('CREATE TABLE IF NOT EXISTS config(id INTEGER PRIMARY KEY, sha TEXT UNIQUE, config TEXT) STRICT;') ||
+	die "cannot CREATE TABLE config";
+
+my $config = "";
+open(my $config_f, "<.config") or die "cannot read .config";
+while (<$config_f>) {
+	next if /^#/;
+	next if /^$/;
+	$config .= $_;
+}
+close $config_f;
+
+my $config_sha = sha1_hex($config);
+my $ins = $dbh->prepare('INSERT INTO config(sha, config) VALUES (?, ?)') || die "cannot prepare";
+$ins->{PrintError} = 0;
+$ins->execute($config_sha, $config) or $ins->err == SQLITE_CONSTRAINT_UNIQUE or die $dbh->errstr;
 
 $dbh->do(<<'EOF'
 CREATE TABLE IF NOT EXISTS run(
@@ -36,11 +55,12 @@ CREATE TABLE IF NOT EXISTS run(
 	version TEXT,
 	sha TEXT,
 	filter TEXT,
+	config INTEGER REFERENCES config(id),
 	skip INTEGER NOT NULL CHECK(skip IN (0, 1)),
 	timestamp TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW', 'localtime'))
 ) STRICT;
 EOF
-) || die "cannot CREATE TABLE";
+) || die "cannot CREATE TABLE run";
 
 my $sha;
 my $version;
@@ -62,8 +82,10 @@ foreach my $srctree (qw|. source|) {
 	last;
 }
 
-my $ins = $dbh->prepare('INSERT INTO run(version, sha, filter, skip) VALUES (?, ?, ?, ?)') || die "cannot prepare";
-$ins->execute($version, $sha, $filter, $skip);
+
+$ins = $dbh->prepare('INSERT INTO run(version, sha, filter, config, skip) ' .
+	'SELECT ?, ?, ?, id, ? FROM config WHERE sha = ?') || die "cannot prepare";
+$ins->execute($version, $sha, $filter, $skip, $config_sha);
 my $run_id = $dbh->last_insert_id();
 $dbh->commit;
 
