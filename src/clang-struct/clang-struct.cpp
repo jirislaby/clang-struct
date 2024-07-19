@@ -87,7 +87,7 @@ private:
 	}
 	void handleME(const MemberExpr *ME, int store);
 	void handleRD(const RecordDecl *RD);
-	void handleILE(const InitListExpr *ILE);
+	void handleILE(const InitListExpr *ILE, ASTContext *AC);
 
 	static std::string getNDName(const NamedDecl *ND);
 	static std::string getRDName(const RecordDecl *RD);
@@ -363,7 +363,7 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 	}
 }
 
-void MatchCallback::handleILE(const InitListExpr *ILE)
+void MatchCallback::handleILE(const InitListExpr *ILE, ASTContext *AC)
 {
 	auto T = ILE->getType().getCanonicalType();
 	if (auto RT = T->getAsStructureType()) {
@@ -393,9 +393,26 @@ void MatchCallback::handleILE(const InitListExpr *ILE)
 				init->dumpColor();
 				SR.dump(SM);*/
 			}
-			// implicit initializers has invalid SR
-			if (!SR.isValid())
-				SR = ILE->getSourceRange();
+			// implicit initializers have invalid SR, so have nested ILEs
+			if (SR.isInvalid()) {
+				auto parent = DynTypedNode::create(*ILE);
+				auto &map = AC->getParentMapContext();
+				for (unsigned jumps = 1;; jumps++) {
+					SR = parent.getSourceRange();
+					if (SR.isValid())
+						break;
+					parent = map.getParents(parent)[0];
+					if (!parent.get<InitListExpr>()) {
+						llvm::errs() << "idx=" << idx << " jumps=" <<
+								jumps << "\n";
+						field->dumpColor();
+						RD->dumpColor();
+						ILE->dumpColor();
+						parent.dump(llvm::errs(), *AC);
+						abort();
+					}
+				}
+			}
 
 			handleUse(SR, field, RD, 0, implicit);
 		}
@@ -426,7 +443,7 @@ void MatchCallback::run(const MatchFinder::MatchResult &res)
 			handleRD(RD);
 	}
 	if (auto ILE = res.Nodes.getNodeAs<InitListExpr>("ILE")) {
-		handleILE(ILE);
+		handleILE(ILE, res.Context);
 	}
 }
 
