@@ -46,3 +46,12 @@ bundle exec rails server -e production
 ```
 
 Note that `libyaml-devel` and `ruby-devel` packages are likely needed for install to succeed.
+
+## Docker Image
+Feel free to pull and run also a docker image. It contains a pre-built database for the latest major Linux kernel release.
+```sh
+docker pull jirislaby/ror-clang-struct
+docker run -p 3000:3000 -e RAILS_MASTER_KEY=753e802f52bb90408604adbb90e0d0aa jirislaby/ror-clang-struct
+```
+
+Then visit http://localhost:3000.
