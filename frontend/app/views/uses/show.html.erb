@@ -1,8 +1,9 @@
 <h1>Listing uses of <span class="backlink"><%= link_to(@member.struct.name, struct_path(@member.struct)) %>.<%= @member.name %></span></h1>
 <div>
   <div>
-    Number of listed uses: <strong><%= @uses_count %></strong>
+    Listing <strong><%= @offset %>-<%= @offset + @uses_count %>/<%= @uses_all_count %></strong> uses.
   </div>
+  <%= render 'shared/prev_next' %>
   <table class="structs">
     <thead>
       <tr>
@@ -25,5 +26,6 @@
       <% end %>
     </tbody>
   </table>
+  <%= render 'shared/prev_next' %>
 </div>
 <br>
