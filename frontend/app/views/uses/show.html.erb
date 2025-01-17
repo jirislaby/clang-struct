@@ -3,6 +3,24 @@
   <div>
     Listing <strong><%= @offset %>-<%= @offset + @uses_count %>/<%= @uses_all_count %></strong> uses.
   </div>
+  <div class="search_line">
+    <%= form_with method: :get do |form| %>
+      <%= form.label :access, "<b>Access</b>:".html_safe %>
+      <%= form.radio_button :access, "any", :checked => true %>
+      <%= form.label :access_any, "Any" %>
+      <%= form.radio_button :access, "load", :checked => params[:access] == "load" %>
+      <%= form.label :access_load, "Load" %>
+      <%= form.radio_button :access, "store", :checked => params[:access] == "store" %>
+      <%= form.label :access_store, "Store" %>
+      <%= form.radio_button :access, "unknown", :checked => params[:access] == "unknown" %>
+      <%= form.label :access_unknown, "Unknown" %>
+      <span class="spacer"></span>
+      <%= form.check_box :noimplicit, :checked => params[:noimplicit] == "1" %>
+      <%= form.label :noimplicit, "Exclude <b>implicit</b> stores".html_safe %>
+      <span class="spacer"></span>
+      <%= form.submit 'Submit' %>
+    <% end %>
+  </div>
   <%= render 'shared/prev_next' %>
   <table class="structs">
     <thead>

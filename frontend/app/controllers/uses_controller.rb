@@ -11,6 +11,19 @@ class UsesController < ApplicationController
     @member = Member.joins(:struct).find(params[:id])
     @uses = Use.where(member: @member).left_joins(:run)
 
+    case params[:access]
+    when 'load'
+      @uses = @uses.onlyload
+    when 'store'
+      @uses = @uses.onlystore
+    when 'unknown'
+      @uses = @uses.onlyunknown
+    end
+
+    if params[:noimplicit] == '1'
+      @uses = @uses.noimplicit
+    end
+
     listing_limit_cropped = listing_limit * 3 + 1
 
     @page = @offset = 0
