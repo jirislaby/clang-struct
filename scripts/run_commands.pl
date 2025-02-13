@@ -13,6 +13,7 @@ use JSON;
 use Parallel::ForkManager;
 
 my $basepath = "";
+my $clean;
 my $dbfile = 'structs.db';
 my $filter;
 my $run_id;
@@ -21,6 +22,7 @@ my $skip = 0;
 my $verbose = 0;
 GetOptions(
 	"basepath=s"	=> \$basepath,
+	"clean"		=> \$clean,
 	"filter=s"	=> \$filter,
 	"run=i"		=> \$run_id,
 	"silent+"	=> \$silent,
@@ -29,6 +31,8 @@ GetOptions(
 or die("Error in command line arguments\n");
 
 my %skip_files;
+
+unlink $dbfile or die "cannot remove $dbfile" if ($clean && -f $dbfile);
 
 my $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile", undef, undef,
 	{ AutoCommit => 0, sqlite_extended_result_codes	=> 1 }) ||
