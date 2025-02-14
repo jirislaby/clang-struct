@@ -3,7 +3,6 @@ use strict;
 use warnings;
 use Digest::SHA qw(sha1_hex);
 use DBI;
-use DBD::SQLite::Constants qw(SQLITE_CONSTRAINT_UNIQUE);
 use Cwd 'abs_path';
 use Error qw(:try);
 use File::Spec;
@@ -14,7 +13,8 @@ use Parallel::ForkManager;
 
 my $basepath = "";
 my $clean;
-my $dbfile = 'structs.db';
+my $db_host = '127.0.0.1';
+my $db_port = 3306;
 my $filter;
 my $run_id;
 my $silent = 0;
@@ -23,6 +23,8 @@ my $verbose = 0;
 GetOptions(
 	"basepath=s"	=> \$basepath,
 	"clean"		=> \$clean,
+	"db-host=s"	=> \$db_host,
+	"db-port=i"	=> \$db_port,
 	"filter=s"	=> \$filter,
 	"run=i"		=> \$run_id,
 	"silent+"	=> \$silent,
@@ -32,26 +34,40 @@ or die("Error in command line arguments\n");
 
 my %skip_files;
 
-unlink $dbfile or die "cannot remove $dbfile" if ($clean && -f $dbfile);
-
-my $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile", undef, undef,
-	{ AutoCommit => 0, sqlite_extended_result_codes	=> 1 }) ||
+my $dsn = "DBI:MariaDB:database=clang_struct;host=$db_host;port=$db_port";
+my $dbh = DBI->connect($dsn, 'clang_struct', 'pass',
+	{ AutoCommit => 0, }) ||
 	die "connect to db error: " . DBI::errstr;
 
-$dbh->do('CREATE TABLE IF NOT EXISTS config(id INTEGER PRIMARY KEY, sha TEXT UNIQUE, config TEXT) STRICT;') ||
-	die "cannot CREATE TABLE config";
+if ($clean) {
+	$dbh->do('DROP TABLE IF EXISTS `use`;') or die "cannot DROP";
+	$dbh->do('DROP TABLE IF EXISTS member;') or die "cannot DROP";
+	$dbh->do('DROP TABLE IF EXISTS struct;') or die "cannot DROP";
+	$dbh->do('DROP TABLE IF EXISTS source;') or die "cannot DROP";
+	$dbh->do('DROP TABLE IF EXISTS run;') or die "cannot DROP";
+	$dbh->do('DROP TABLE IF EXISTS config;') or die "cannot DROP";
+}
+
+$dbh->do(<<'EOF'
+CREATE TABLE IF NOT EXISTS config(
+	id INTEGER UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+	sha VARCHAR(128) UNIQUE,
+	config MEDIUMTEXT
+);
+EOF
+) or die "cannot CREATE TABLE config";
 $dbh->do(<<'EOF'
 CREATE TABLE IF NOT EXISTS run(
-	id INTEGER PRIMARY KEY,
-	version TEXT,
-	sha TEXT,
+	id INTEGER UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+	version TINYTEXT,
+	sha VARCHAR(128),
 	filter TEXT,
-	config INTEGER REFERENCES config(id),
-	skip INTEGER NOT NULL CHECK(skip IN (0, 1)),
-	timestamp TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW', 'localtime'))
-) STRICT;
+	config INTEGER UNSIGNED REFERENCES config(id),
+	skip BOOLEAN NOT NULL,
+	timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 EOF
-) || die "cannot CREATE TABLE run";
+) or die "cannot CREATE TABLE run";
 
 if (defined $run_id) {
 	$dbh->selectrow_hashref('SELECT id FROM run WHERE id = ?', undef, $run_id) or die "no such run_id: $run_id";
@@ -68,7 +84,8 @@ if (defined $run_id) {
 	my $config_sha = sha1_hex($config);
 	my $ins = $dbh->prepare('INSERT INTO config(sha, config) VALUES (?, ?)') || die "cannot prepare";
 	$ins->{PrintError} = 0;
-	$ins->execute($config_sha, $config) or $ins->err == SQLITE_CONSTRAINT_UNIQUE or die $dbh->errstr;
+	# #define ER_DUP_ENTRY 1062
+	$ins->execute($config_sha, $config) or $ins->err == 1062 or die $dbh->errstr;
 
 	my $sha;
 	my $version;
@@ -141,12 +158,6 @@ sub stop() {
 $SIG{'INT'} = \&stop;
 $SIG{'TERM'} = \&stop;
 
-my $daemon = fork();
-if (!$daemon) {
-	exec('db_filler');
-	die;
-}
-
 my $start_time = time;
 my $period = $start_time;
 my $counter = 0;
@@ -197,6 +208,8 @@ foreach my $entry (@{$json}) {
 	$cmd .= ' -w --analyze --analyzer-no-default-checks';
 	$cmd .= ' -Xclang -load -Xclang clang-struct.so';
 	$cmd .= ' -Xclang -analyzer-checker -Xclang jirislaby.StructMembersChecker';
+	$cmd .= " -Xclang -analyzer-config -Xclang jirislaby.StructMembersChecker:dbHost=$db_host";
+	$cmd .= " -Xclang -analyzer-config -Xclang jirislaby.StructMembersChecker:dbPort=$db_port";
 	$cmd .= " -Xclang -analyzer-config -Xclang jirislaby.StructMembersChecker:basePath=$basepath";
 	$cmd .= " -Xclang -analyzer-config -Xclang jirislaby.StructMembersChecker:runId=$run_id";
 	#print "$cmd\n";
@@ -206,8 +219,5 @@ foreach my $entry (@{$json}) {
 print STDERR "Done, waiting for ", scalar $pm->running_procs, " children\n";
 
 $pm->wait_all_children;
-
-kill 'TERM', $daemon;
-wait;
 
 1;

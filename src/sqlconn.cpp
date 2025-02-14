@@ -1,24 +1,12 @@
-#include <charconv>
-#include <chrono>
-#include <thread>
+#include <sstream>
 #include <vector>
+
+#include <mysqld_error.h>
 
 #include "sqlconn.h"
 
-static int busy_handler(void *data, int count)
-{
-	static const auto WAIT_INTVAL = std::chrono::milliseconds(20);
-	static const auto WAIT_TIMEOUT = std::chrono::minutes(20) / WAIT_INTVAL;
-
-	if (count >= WAIT_TIMEOUT)
-		return 0;
-
-	std::this_thread::sleep_for(WAIT_INTVAL);
-
-	return 1;
-}
-
-void joinVec(std::ostringstream &ss, const std::vector<const char *> vec, const std::string &sep = ", ")
+void joinVec(std::ostringstream &ss, const std::vector<const char *> &vec,
+	     const std::string &sep = ", ")
 {
 	for (auto i = vec.begin(), end = vec.end(); i != end; ++i) {
 		ss << *i;
@@ -27,91 +15,84 @@ void joinVec(std::ostringstream &ss, const std::vector<const char *> vec, const 
 	}
 }
 
-template <typename T>
-int SQLConn<T>::openDB(const std::string &dbFile)
+int SQLConn::openDB(const std::string &host, const unsigned int &port)
 {
-	sqlite3 *sql;
-	char *err;
+	MYSQL *sql;
 	int ret;
 
-	ret = sqlite3_open_v2(dbFile.c_str(), &sql, SQLITE_OPEN_READWRITE |
-			      SQLITE_OPEN_CREATE, NULL);
+	sql = mysql_init(NULL);
+	if (!sql) {
+		std::cerr << "db init failed\n";
+		return -1;
+	}
+
 	sqlHolder.reset(sql);
-	if (ret != SQLITE_OK) {
-		std::cerr << "db open failed: " << sqlite3_errstr(ret) << "\n";
+
+	unsigned int proto = MYSQL_PROTOCOL_TCP;
+	if (mysql_optionsv(sqlHolder, MYSQL_OPT_PROTOCOL, &proto)) {
+		std::cerr << "db set protocol failed: " << mysql_error(sqlHolder) << "\n";
 		return -1;
 	}
 
-	ret = sqlite3_exec(sqlHolder, "PRAGMA foreign_keys = ON;", NULL, NULL,
-			   &err);
-	if (ret != SQLITE_OK) {
-		std::cerr << "db PRAGMA failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " << err << "\n";
-		sqlite3_free(err);
-		return -1;
-	}
-
-	ret = sqlite3_busy_handler(sqlHolder, busy_handler, nullptr);
-	if (ret != SQLITE_OK) {
-		std::cerr << "db busy_handler failed (" << __LINE__ << "): " <<
-				sqlite3_errstr(ret) << " -> " << err << "\n";
-		sqlite3_free(err);
+	if (!mysql_real_connect(sqlHolder, host.c_str(), "clang_struct", "pass", "clang_struct",
+				port, nullptr, 0)) {
+		std::cerr << "db connection failed: " << mysql_error(sqlHolder) << "\n";
 		return -1;
 	}
 
 	static const std::vector<std::pair<const char *, std::vector<const char *>>> create_tables {
 		{ "run", {
-			"id INTEGER PRIMARY KEY",
+			"id INTEGER UNSIGNED AUTO_INCREMENT PRIMARY KEY",
 			"version TEXT",
-			"sha TEXT",
+			"sha VARCHAR(128)",
 			"filter TEXT",
-			"skip INTEGER NOT NULL CHECK(skip IN (0, 1))",
-			"timestamp TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW', 'localtime'))",
+			"skip BOOLEAN NOT NULL",
+			"timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
 		}},
 		{ "source", {
-			"id INTEGER PRIMARY KEY",
-			"run INTEGER REFERENCES run(id)",
+			"id INTEGER UNSIGNED AUTO_INCREMENT PRIMARY KEY",
+			"run INTEGER UNSIGNED REFERENCES run(id)",
 			"src TEXT NOT NULL UNIQUE",
 		}},
 		{ "struct", {
-			"id INTEGER PRIMARY KEY",
-			"run INTEGER REFERENCES run(id)",
-			"parent INTEGER REFERENCES struct(id) ON DELETE CASCADE",
-			"type TEXT NOT NULL CHECK(type IN ('s', 'u'))",
+			"id INTEGER UNSIGNED AUTO_INCREMENT PRIMARY KEY",
+			"run INTEGER UNSIGNED REFERENCES run(id)",
+			"parent INTEGER UNSIGNED REFERENCES struct(id) ON DELETE CASCADE",
+			"type CHAR(1) NOT NULL CHECK(type IN ('s', 'u'))",
 			"name TEXT NOT NULL",
 			"attrs TEXT",
-			"packed INTEGER NOT NULL CHECK(packed IN (0, 1))",
-			"inMacro INTEGER NOT NULL CHECK(inMacro IN (0, 1))",
-			"src INTEGER NOT NULL REFERENCES source(id) ON DELETE CASCADE",
-			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL",
-			"endLine INTEGER, endCol INTEGER",
+			"packed BOOLEAN NOT NULL",
+			"inMacro BOOLEAN NOT NULL",
+			"src INTEGER UNSIGNED NOT NULL REFERENCES source(id) ON DELETE CASCADE",
+			"begLine INTEGER UNSIGNED NOT NULL, begCol INTEGER UNSIGNED NOT NULL",
+			"endLine INTEGER UNSIGNED, endCol INTEGER UNSIGNED",
 			"UNIQUE(name, src, begLine, begCol)",
 		}},
 		{ "member", {
-			"id INTEGER PRIMARY KEY",
-			"run INTEGER REFERENCES run(id)",
+			"id INTEGER UNSIGNED AUTO_INCREMENT PRIMARY KEY",
+			"run INTEGER UNSIGNED REFERENCES run(id)",
 			"name TEXT NOT NULL",
-			"struct INTEGER NOT NULL REFERENCES struct(id) ON DELETE CASCADE",
-			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL",
-			"endLine INTEGER, endCol INTEGER",
-			"uses INTEGER NOT NULL DEFAULT 0",
-			"loads INTEGER NOT NULL DEFAULT 0",
-			"stores INTEGER NOT NULL DEFAULT 0",
-			"implicit_uses INTEGER NOT NULL DEFAULT 0",
+			"struct INTEGER UNSIGNED NOT NULL REFERENCES struct(id) ON DELETE CASCADE",
+			"begLine INTEGER UNSIGNED NOT NULL, begCol INTEGER UNSIGNED NOT NULL",
+			"endLine INTEGER UNSIGNED, endCol INTEGER UNSIGNED",
+			"uses INTEGER UNSIGNED NOT NULL DEFAULT 0",
+			"loads INTEGER UNSIGNED NOT NULL DEFAULT 0",
+			"stores INTEGER UNSIGNED NOT NULL DEFAULT 0",
+			"implicit_uses INTEGER UNSIGNED NOT NULL DEFAULT 0",
 			"UNIQUE(struct, name, begLine, begCol)",
 			"CHECK(endLine >= begLine)",
 			"CHECK(uses >= loads + stores)",
 			"CHECK(uses >= implicit_uses)",
 		}},
-		{ "use", {
-			"id INTEGER PRIMARY KEY",
-			"run INTEGER REFERENCES run(id)",
-			"member INTEGER NOT NULL REFERENCES member(id) ON DELETE CASCADE",
-			"src INTEGER NOT NULL REFERENCES source(id) ON DELETE CASCADE",
-			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL",
-			"endLine INTEGER, endCol INTEGER",
-			"load INTEGER CHECK(load IN (0, 1))",
-			"implicit INTEGER NOT NULL CHECK(implicit IN (0, 1))",
+		{ "`use`", {
+			"id INTEGER UNSIGNED AUTO_INCREMENT PRIMARY KEY",
+			"run INTEGER UNSIGNED REFERENCES run(id)",
+			"member INTEGER UNSIGNED NOT NULL REFERENCES member(id) ON DELETE CASCADE",
+			"src INTEGER UNSIGNED NOT NULL REFERENCES source(id) ON DELETE CASCADE",
+			"begLine INTEGER UNSIGNED NOT NULL, begCol INTEGER UNSIGNED NOT NULL",
+			"endLine INTEGER UNSIGNED, endCol INTEGER UNSIGNED",
+			"`load` BOOLEAN",
+			"implicit BOOLEAN NOT NULL",
 			"UNIQUE(member, src, begLine)",
 			"CHECK(endLine >= begLine)",
 		}},
@@ -121,34 +102,30 @@ int SQLConn<T>::openDB(const std::string &dbFile)
 		std::ostringstream ss;
 		ss << "CREATE TABLE IF NOT EXISTS " << c.first << '(';
 		joinVec(ss, c.second);
-		ss << ") STRICT;";
-		ret = sqlite3_exec(sqlHolder, ss.str().c_str(), NULL, NULL, &err);
-		if (ret != SQLITE_OK) {
+		ss << ");";
+		ret = mysql_query(sqlHolder, ss.str().c_str());
+		if (ret) {
 			std::cerr << "db CREATE failed (" << __LINE__ << "): " <<
-					sqlite3_errstr(ret) << " -> " <<
-					err << "\n\t" << ss.str() << "\n";
-			sqlite3_free(err);
+					mysql_error(sqlHolder) << "\n\t" << ss.str() << "\n";
 			return -1;
 		}
 	}
 
 	static const std::vector<std::pair<const char *, const char *>> create_triggers {
-		{ "TRIG_use_A_INS AFTER INSERT ON use", "UPDATE member SET uses = uses+1, "
-			"loads = loads + (NEW.load IS 1), "
-			"stores = stores + (NEW.load IS 0), "
-			"implicit_uses = implicit_uses + (NEW.implicit == 1) "
+		{ "TRIG_use_A_INS AFTER INSERT ON `use`", "UPDATE member SET uses = uses+1, "
+			"loads = loads + (NEW.load <=> TRUE), "
+			"stores = stores + (NEW.load <=> FALSE), "
+			"implicit_uses = implicit_uses + (NEW.implicit IS TRUE) "
 			"WHERE id = NEW.member" },
 	};
 
 	for (auto c: create_triggers) {
 		std::string s("CREATE TRIGGER IF NOT EXISTS ");
-		s.append(c.first).append(" FOR EACH ROW BEGIN ").append(c.second).append("; END;");
-		ret = sqlite3_exec(sqlHolder, s.c_str(), NULL, NULL, &err);
-		if (ret != SQLITE_OK) {
+		s.append(c.first).append(" FOR EACH ROW ").append(c.second).append(";");
+		ret = mysql_query(sqlHolder, s.c_str());
+		if (ret) {
 			std::cerr << "db CREATE failed (" << __LINE__ << "): " <<
-					sqlite3_errstr(ret) << " -> " <<
-					err << "\n\t" << s << "\n";
-			sqlite3_free(err);
+					mysql_error(sqlHolder) << "\n\t" << s << "\n";
 			return -1;
 		}
 	}
@@ -157,26 +134,26 @@ int SQLConn<T>::openDB(const std::string &dbFile)
 		{ "struct_view",
 			"SELECT struct.id, struct.run AS run, type, "
 				"struct.name AS struct, attrs, packed, inMacro, source.src, "
-				"struct.begLine || ':' || struct.begCol || '-' || "
-				"struct.endLine || ':' || struct.endCol AS location "
+				"CONCAT(struct.begLine, ':', struct.begCol, '-', "
+				"struct.endLine, ':', struct.endCol) AS location "
 			"FROM struct LEFT JOIN source ON struct.src=source.id"
 		},
 		{ "member_view",
 			"SELECT member.id, member.run AS run, struct.name AS struct, struct.attrs, "
 				"member.name AS member, source.src, "
-				"member.begLine || ':' || member.begCol || '-' || "
-				"member.endLine || ':' || member.endCol AS location, "
+				"CONCAT(member.begLine, ':', member.begCol, '-', "
+				"member.endLine, ':', member.endCol) AS location, "
 				"uses, loads, stores, implicit_uses "
 			"FROM member "
 			"LEFT JOIN struct ON member.struct=struct.id "
 			"LEFT JOIN source ON struct.src=source.id"
 		},
 		{ "use_view",
-			"SELECT use.id, use.run AS run, struct.name AS struct, struct.attrs, "
+			"SELECT `use`.id, `use`.run AS run, struct.name AS struct, struct.attrs, "
 				"member.name AS member, source.src, "
-				"use.begLine || ':' || use.begCol || '-' || "
-				"use.endLine || ':' || use.endCol AS location, load, implicit "
-			"FROM use "
+				"CONCAT(`use`.begLine, ':', `use`.begCol, '-', "
+				"`use`.endLine, ':', `use`.endCol) AS location, `load`, implicit "
+			"FROM `use` "
 			"LEFT JOIN member ON use.member=member.id "
 			"LEFT JOIN struct ON member.struct=struct.id "
 			"LEFT JOIN source ON use.src=source.id"
@@ -184,12 +161,12 @@ int SQLConn<T>::openDB(const std::string &dbFile)
 		{ "unused_view",
 			"SELECT member.run AS run, struct.name AS struct, struct.attrs, "
 				"member.name AS member, source.src, "
-				"member.begLine || ':' || member.begCol || '-' || "
-				"member.endLine || ':' || member.endCol AS location "
+				"CONCAT(member.begLine, ':', member.begCol, '-', "
+				"member.endLine, ':', member.endCol) AS location "
 			"FROM member "
 			"LEFT JOIN struct ON member.struct=struct.id "
 			"LEFT JOIN source ON struct.src=source.id "
-			"WHERE member.id NOT IN (SELECT member FROM use) "
+			"WHERE member.id NOT IN (SELECT member FROM `use`) "
 				"AND struct.name != '<anonymous>' AND struct.name != '<unnamed>' "
 				"AND member.name != '<unnamed>'"
 		},
@@ -197,13 +174,11 @@ int SQLConn<T>::openDB(const std::string &dbFile)
 
 	for (auto c: create_views) {
 		std::string s("CREATE VIEW IF NOT EXISTS ");
-		s.append(c.first).append(" AS ").append(c.second);
-		ret = sqlite3_exec(sqlHolder, s.c_str(), NULL, NULL, &err);
-		if (ret != SQLITE_OK) {
+		s.append(c.first).append(" AS ").append(c.second).append(";");
+		ret = mysql_query(sqlHolder, s.c_str());
+		if (ret) {
 			std::cerr << "db CREATE failed (" << __LINE__ << "): " <<
-					sqlite3_errstr(ret) << " -> " <<
-					err << "\n\t" << s << "\n";
-			sqlite3_free(err);
+					mysql_error(sqlHolder) << "\n\t" << s << "\n";
 			return -1;
 		}
 	}
@@ -211,85 +186,75 @@ int SQLConn<T>::openDB(const std::string &dbFile)
 	return 0;
 }
 
-
-template <typename T>
-int SQLConn<T>::prepDB()
+SQLStmtHolder SQLConn::stmtPrepare(const std::string &query)
 {
-	sqlite3_stmt *stmt;
-	int ret;
-
-	ret = sqlite3_prepare_v2(sqlHolder,
-				 "INSERT INTO source(run, src) "
-				 "VALUES (:run, :src);",
-				 -1, &stmt, NULL);
-	insSrc.reset(stmt);
-	if (ret != SQLITE_OK) {
-		std::cerr << "db prepare failed (" << __LINE__ << "): " <<
-			     sqlite3_errstr(ret) << " -> " <<
-			     sqlite3_errmsg(sqlHolder) << "\n";
-		return -1;
+	SQLStmtHolder s(mysql_stmt_init(sqlHolder));
+	if (!s) {
+		std::cerr << "db stmt init failed (" << query << "): " <<
+			     mysql_error(sqlHolder) << "\n";
+		return nullptr;
 	}
 
-	ret = sqlite3_prepare_v2(sqlHolder,
-				 "INSERT INTO "
-				 "struct(run, type, name, attrs, packed, inMacro, src, begLine, begCol, endLine, endCol) "
-				 "SELECT :run, :type, :name, :attrs, :packed, :inMacro, id, :begLine, :begCol, :endLine, :endCol "
-					"FROM source WHERE src=:src;",
-				 -1, &stmt, NULL);
-	insStr.reset(stmt);
-	if (ret != SQLITE_OK) {
-		std::cerr << "db prepare failed (" << __LINE__ << "): " <<
-			     sqlite3_errstr(ret) << " -> " <<
-			     sqlite3_errmsg(sqlHolder) << "\n";
-		return -1;
+	if (mysql_stmt_prepare(s, query.c_str(), query.length())) {
+		std::cerr << "db prepare failed (" << query << "): " <<
+			     mysql_error(sqlHolder) << "\n";
+		return nullptr;
 	}
 
-	ret = sqlite3_prepare_v2(sqlHolder,
-				 "INSERT INTO "
-				 "member(run, name, struct, begLine, begCol, endLine, endCol) "
-				 "SELECT :run, :name, struct.id, :begLine, :begCol, :endLine, :endCol "
-					"FROM struct LEFT JOIN source ON struct.src=source.id "
-					"WHERE source.src=:src AND "
-					"begLine=:strBegLine AND begCol=:strBegCol AND "
-					"name=:struct;",
-				 -1, &stmt, NULL);
-	insMem.reset(stmt);
-	if (ret != SQLITE_OK) {
-		std::cerr << "db prepare failed (" << __LINE__ << "): " <<
-			     sqlite3_errstr(ret) << " -> " <<
-			     sqlite3_errmsg(sqlHolder) << "\n";
-		return -1;
-	}
+	return s;
+}
 
-	ret = sqlite3_prepare_v2(sqlHolder,
-				 "INSERT INTO "
-				 "use(run, member, src, begLine, begCol, endLine, endCol, load, implicit) "
-				 "SELECT :run, (SELECT member.id FROM member "
-						"LEFT JOIN struct ON member.struct=struct.id "
-						"LEFT JOIN source ON struct.src=source.id "
-						"WHERE member.name=:member AND "
-						"struct.name=:struct AND "
-						"source.src=:strSrc AND "
-						"struct.begLine=:strLine AND "
-						"struct.begCol=:strCol), "
-					"(SELECT id FROM source WHERE src=:use_src), "
-					":begLine, :begCol, :endLine, :endCol, :load, :implicit;",
-				 -1, &stmt, NULL);
-	insUse.reset(stmt);
-	if (ret != SQLITE_OK) {
-		std::cerr << "db prepare failed (" << __LINE__ << "): " <<
-			     sqlite3_errstr(ret) << " -> " <<
-			     sqlite3_errmsg(sqlHolder) << "\n";
+int SQLConn::prepDB()
+{
+	insSrc = stmtPrepare("INSERT INTO source(run, src) "
+			     "VALUES (?, ?);");
+	if (!insSrc)
 		return -1;
-	}
+
+	insStr = stmtPrepare("INSERT INTO "
+			     "struct(run, type, name, attrs, packed, inMacro, src, begLine, begCol, endLine, endCol) "
+			     "SELECT ?, ?, ?, ?, ?, ?, id, ?, ?, ?, ? "
+			     "FROM source WHERE src=?");
+	if (!insStr)
+		return -1;
+
+	insMem = stmtPrepare("INSERT INTO "
+			     "member(run, name, struct, begLine, begCol, endLine, endCol) "
+			     "SELECT ?, ?, struct.id, ?, ?, ?, ? "
+			     "FROM struct LEFT JOIN source ON struct.src=source.id "
+			     "WHERE source.src=? AND "
+			     "begLine=? AND begCol=? AND "
+			     "name=?;");
+	if (!insMem)
+		return -1;
+
+	// triggers in mariadb do not support updating the same as nested select table
+	insUseMem = stmtPrepare("SELECT member.id FROM member "
+				"LEFT JOIN struct ON member.struct=struct.id "
+				"LEFT JOIN source ON struct.src=source.id "
+				"WHERE member.name=? AND "
+				"member.begLine=? AND "
+				"member.begCol=? AND "
+				"struct.name=? AND "
+				"struct.begLine=? AND "
+				"struct.begCol=? AND "
+				"source.src=? "
+				"FOR UPDATE INTO @member_id;");
+	if (!insUseMem)
+		return -1;
+
+	insUse = stmtPrepare("INSERT INTO "
+			     "`use`(run, member, src, begLine, begCol, endLine, endCol, `load`, implicit) "
+			     "SELECT ?, @member_id, id, ?, ?, ?, ?, ?, ? FROM source WHERE src=?;");
+	if (!insUse)
+		return -1;
 
 	return 0;
 }
 
-template <typename T>
-int SQLConn<T>::open(const std::string &dbFile)
+int SQLConn::open(const std::string &host, const unsigned int &port)
 {
-	if (openDB(dbFile) < 0)
+	if (openDB(host, port) < 0)
 		return -1;
 	if (prepDB() < 0)
 		return -1;
@@ -297,115 +262,268 @@ int SQLConn<T>::open(const std::string &dbFile)
 	return 0;
 }
 
-template <typename T>
-int SQLConn<T>::begin()
+int SQLConn::begin()
 {
-	char *err;
-	int ret = sqlite3_exec(sqlHolder, "BEGIN;", NULL, NULL, &err);
-	if (ret != SQLITE_OK) {
+	if (mysql_query(sqlHolder, "BEGIN;")) {
 		std::cerr << "db BEGIN failed (" << __LINE__ << "): " <<
-			     sqlite3_errstr(ret) << " -> " << err << "\n";
-		sqlite3_free(err);
+			     mysql_error(sqlHolder) << "\n";
 		return -1;
 	}
 
 	return 0;
 }
 
-template <typename T>
-int SQLConn<T>::end()
+int SQLConn::end()
 {
-	char *err;
-	int ret = sqlite3_exec(sqlHolder, "END;", NULL, NULL, &err);
-	if (ret != SQLITE_OK) {
-		std::cerr << "db BEGIN failed (" << __LINE__ << "): " <<
-			     sqlite3_errstr(ret) << " -> " << err << "\n";
-		sqlite3_free(err);
+	if (mysql_query(sqlHolder, "COMMIT;")) {
+		std::cerr << "db COMMIT failed (" << __LINE__ << "): " <<
+			     mysql_error(sqlHolder) << "\n";
 		return -1;
 	}
 
 	return 0;
 }
 
-template <typename T>
-int SQLConn<T>::bindAndStep(SQLStmtHolder &ins, const Msg &msg)
+int SQLConn::bindAndExec(MYSQL_STMT *stmt, MYSQL_BIND *bind, const int line)
 {
-	SQLStmtResetter insSrcResetter(sqlHolder, ins);
-	int ret;
-
-	for (auto e: msg) {
-		const auto [type, key, val] = e;
-
-		std::string bind(":");
-		bind.append(key);
-		auto bindIdx = sqlite3_bind_parameter_index(ins, bind.c_str());
-		if (!bindIdx) {
-			std::cerr << "no index found for key=" << key << "\n";
-			std::cerr << "\t" << msg << "\n";
-			return -1;
-		}
-
-		if (type == Msg::TYPE::TEXT) {
-			ret = sqlite3_bind_text(ins, bindIdx, val.data(), val.length(), SQLITE_TRANSIENT);
-		} else if (type == Msg::TYPE::INT) {
-			auto end = val.data() + val.size();
-			int i;
-			auto res = std::from_chars(val.data(), end, i);
-			if (res.ptr != end) {
-				std::cerr << "bad int val=\"" << val << "\"\n";
-				return -1;
-			}
-			ret = sqlite3_bind_int(ins, bindIdx, i);
-		} else if (type == Msg::TYPE::NUL) {
-			ret = sqlite3_bind_null(ins, bindIdx);
-		} else {
-			std::cerr << "bad type: " << msg << "\n";
-			abort();
-		}
-
-		if (ret != SQLITE_OK) {
-			std::cerr << "db bind failed (" << __LINE__ << " key=\"" << key <<
-				     "\" val=\"" << val << "\"): " <<
-				     sqlite3_errstr(ret) << " -> " <<
-				     sqlite3_errmsg(sqlHolder) << "\n";
-			return -1;
-		}
-	}
-
-	ret = sqlite3_step(ins);
-	if (ret != SQLITE_DONE && sqlite3_extended_errcode(sqlHolder) != SQLITE_CONSTRAINT_UNIQUE) {
-		std::cerr << "db step failed (" << __LINE__ << "): " <<
-			     sqlite3_errstr(ret) << " -> " <<
-			     sqlite3_errmsg(sqlHolder) << "\n";
-		std::cerr << "\t" << msg << "\n";
+	if (mysql_stmt_bind_param(stmt, bind)) {
+		std::cerr << "db bind failed (" << line << "): " <<
+			     mysql_error(sqlHolder) << "\n";
 		return -1;
 	}
 
-	return 0;
-}
+	for (unsigned i = 0; i < 3; i++) {
+		int ret = mysql_stmt_execute(stmt);
+		if (!ret)
+			return 0;
+		if (mysql_stmt_errno(stmt) == ER_DUP_ENTRY)
+			return 0;
+		if (mysql_stmt_errno(stmt) != ER_LOCK_DEADLOCK)
+			break;
+	}
 
-template <typename T>
-int SQLConn<T>::handleMessage(const Msg &msg)
-{
-	auto kind = msg.getKind();
-
-	if (kind == Msg::KIND::SOURCE)
-		return bindAndStep(insSrc, msg);
-	if (kind == Msg::KIND::STRUCT)
-		return bindAndStep(insStr, msg);
-	if (kind == Msg::KIND::MEMBER)
-		return bindAndStep(insMem, msg);
-	if (kind == Msg::KIND::USE)
-		return bindAndStep(insUse, msg);
-
-	std::cerr << "bad message kind: " << kind << "\n";
-	std::cerr << "\t" << msg << "\n";
-
+	std::cerr << "db exec failed (" << line << "): " <<
+		     mysql_error(sqlHolder) << "\n";
 	return -1;
 }
 
-#ifdef STANDALONE
-template class SQLConn<std::string>;
-#else
-template class SQLConn<std::string_view>;
-#endif
+void SQLConn::addSrc(const Source &src)
+{
+	unsigned int run = src.runId;
+	my_bool run_is_null = src.runId < 0;
+
+	MYSQL_BIND bind[] = {
+		{
+			.is_null = &run_is_null,
+			.buffer = &run,
+			.buffer_type = MYSQL_TYPE_LONG,
+			.is_unsigned = true,
+		}, {
+			.buffer = const_cast<char *>(src.src.c_str()),
+			.buffer_length = src.src.length(),
+			.buffer_type = MYSQL_TYPE_STRING,
+		},
+	};
+
+	bindAndExec(insSrc, bind, __LINE__);
+}
+
+void SQLConn::addStruct(const Struct &_struct)
+{
+	unsigned int run = _struct.runId;
+	my_bool run_is_null = _struct.runId < 0;
+	unsigned int packed = _struct.packed;
+	unsigned int inMacro = _struct.inMacro;
+
+	MYSQL_BIND bind[] = {
+		{
+			.is_null = &run_is_null,
+			.buffer = &run,
+			.buffer_type = MYSQL_TYPE_LONG,
+			.is_unsigned = true,
+		}, {
+			.buffer = const_cast<char *>(_struct.type.c_str()),
+			.buffer_length = _struct.type.length(),
+			.buffer_type = MYSQL_TYPE_STRING,
+		}, {
+			.buffer = const_cast<char *>(_struct.name.c_str()),
+			.buffer_length = _struct.name.length(),
+			.buffer_type = MYSQL_TYPE_STRING,
+		}, {
+			.buffer = const_cast<char *>(_struct.attrs.c_str()),
+			.buffer_length = _struct.attrs.length(),
+			.buffer_type = MYSQL_TYPE_STRING,
+		}, {
+			.buffer = &packed,
+			.buffer_type = MYSQL_TYPE_LONG,
+			.is_unsigned = true,
+		}, {
+			.buffer = &inMacro,
+			.buffer_type = MYSQL_TYPE_LONG,
+			.is_unsigned = true,
+		}, {
+			.buffer = const_cast<unsigned *>(&_struct.loc.begLine),
+			.buffer_type = MYSQL_TYPE_LONG,
+			.is_unsigned = true,
+		}, {
+			.buffer =  const_cast<unsigned *>(&_struct.loc.begCol),
+			.buffer_type = MYSQL_TYPE_LONG,
+			.is_unsigned = true,
+		}, {
+			.buffer =  const_cast<unsigned *>(&_struct.loc.endLine),
+			.buffer_type = MYSQL_TYPE_LONG,
+			.is_unsigned = true,
+		}, {
+			.buffer = const_cast<unsigned *>( &_struct.loc.endCol),
+			.buffer_type = MYSQL_TYPE_LONG,
+			.is_unsigned = true,
+		}, {
+			.buffer = const_cast<char *>(_struct.src.c_str()),
+			.buffer_length = _struct.src.length(),
+			.buffer_type = MYSQL_TYPE_STRING,
+		},
+	};
+
+	bindAndExec(insStr, bind, __LINE__);
+}
+
+void SQLConn::addMember(const Member &member)
+{
+	unsigned int run = member.runId;
+	my_bool run_is_null = member.runId < 0;
+
+	MYSQL_BIND bind[] = {
+		{
+			.is_null = &run_is_null,
+			.buffer = &run,
+			.buffer_type = MYSQL_TYPE_LONG,
+			.is_unsigned = true,
+		}, {
+			.buffer = const_cast<char *>(member.name.c_str()),
+			.buffer_length = member.name.length(),
+			.buffer_type = MYSQL_TYPE_STRING,
+		}, {
+			.buffer = const_cast<unsigned *>(&member.loc.begLine),
+			.buffer_type = MYSQL_TYPE_LONG,
+			.is_unsigned = true,
+		}, {
+			.buffer =  const_cast<unsigned *>(&member.loc.begCol),
+			.buffer_type = MYSQL_TYPE_LONG,
+			.is_unsigned = true,
+		}, {
+			.buffer =  const_cast<unsigned *>(&member.loc.endLine),
+			.buffer_type = MYSQL_TYPE_LONG,
+			.is_unsigned = true,
+		}, {
+			.buffer = const_cast<unsigned *>(&member.loc.endCol),
+			.buffer_type = MYSQL_TYPE_LONG,
+			.is_unsigned = true,
+		}, {
+			.buffer = const_cast<char *>(member.src.c_str()),
+			.buffer_length = member.src.length(),
+			.buffer_type = MYSQL_TYPE_STRING,
+		}, {
+			.buffer = const_cast<unsigned *>(&member.strBegLine),
+			.buffer_type = MYSQL_TYPE_LONG,
+			.is_unsigned = true,
+		}, {
+			.buffer =  const_cast<unsigned *>(&member.strBegCol),
+			.buffer_type = MYSQL_TYPE_LONG,
+			.is_unsigned = true,
+		}, {
+			.buffer = const_cast<char *>(member._struct.c_str()),
+			.buffer_length = member._struct.length(),
+			.buffer_type = MYSQL_TYPE_STRING,
+		},
+	};
+
+	bindAndExec(insMem, bind, __LINE__);
+}
+
+void SQLConn::addUse(const Use &use)
+{
+	unsigned int run = use.runId;
+	my_bool run_is_null = use.runId < 0;
+	unsigned int load = use.load;
+	my_bool load_is_null = use.load < 0;
+	unsigned int implicit = use.implicit;
+
+	MYSQL_BIND bindUseMem[] = {
+		{
+			.buffer = const_cast<char *>(use.member.c_str()),
+			.buffer_length = use.member.length(),
+			.buffer_type = MYSQL_TYPE_STRING,
+		}, {
+			.buffer = const_cast<unsigned *>(&use.memLine),
+			.buffer_type = MYSQL_TYPE_LONG,
+			.is_unsigned = true,
+		}, {
+			.buffer =  const_cast<unsigned *>(&use.memCol),
+			.buffer_type = MYSQL_TYPE_LONG,
+			.is_unsigned = true,
+		}, {
+			.buffer = const_cast<char *>(use._struct.c_str()),
+			.buffer_length = use._struct.length(),
+			.buffer_type = MYSQL_TYPE_STRING,
+		}, {
+			.buffer = const_cast<unsigned *>(&use.strLine),
+			.buffer_type = MYSQL_TYPE_LONG,
+			.is_unsigned = true,
+		}, {
+			.buffer =  const_cast<unsigned *>(&use.strCol),
+			.buffer_type = MYSQL_TYPE_LONG,
+			.is_unsigned = true,
+		}, {
+			.buffer = const_cast<char *>(use.strSrc.c_str()),
+			.buffer_length = use.strSrc.length(),
+			.buffer_type = MYSQL_TYPE_STRING,
+		},
+	};
+	MYSQL_BIND bindUse[] = {
+		{
+			.is_null = &run_is_null,
+			.buffer = &run,
+			.buffer_type = MYSQL_TYPE_LONG,
+			.is_unsigned = true,
+		}, {
+			.buffer = const_cast<unsigned *>(&use.loc.begLine),
+			.buffer_type = MYSQL_TYPE_LONG,
+			.is_unsigned = true,
+		}, {
+			.buffer =  const_cast<unsigned *>(&use.loc.begCol),
+			.buffer_type = MYSQL_TYPE_LONG,
+			.is_unsigned = true,
+		}, {
+			.buffer =  const_cast<unsigned *>(&use.loc.endLine),
+			.buffer_type = MYSQL_TYPE_LONG,
+			.is_unsigned = true,
+		}, {
+			.buffer = const_cast<unsigned *>(&use.loc.endCol),
+			.buffer_type = MYSQL_TYPE_LONG,
+			.is_unsigned = true,
+		}, {
+			.is_null = &load_is_null,
+			.buffer = &load,
+			.buffer_type = MYSQL_TYPE_LONG,
+			.is_unsigned = true,
+		}, {
+			.buffer = &implicit,
+			.buffer_type = MYSQL_TYPE_LONG,
+			.is_unsigned = true,
+		}, {
+			.buffer = const_cast<char *>(use.useSrc.c_str()),
+			.buffer_length = use.useSrc.length(),
+			.buffer_type = MYSQL_TYPE_STRING,
+		},
+	};
+
+	if (bindAndExec(insUseMem, bindUseMem, __LINE__))
+		std::cerr <<
+			     "mem=" << use.member << ", " <<
+			     "str=" << use._struct << ", " <<
+			     "strSrc=" << use.strSrc << ", " <<
+			     "strL=" << use.strLine << ", " <<
+			     "strCol=" << use.strCol <<
+			     "\n";
+	bindAndExec(insUse, bindUse, __LINE__);
+}

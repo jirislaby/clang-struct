@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5.0)
+cmake_minimum_required(VERSION 3.10.0)
 
 # C needed for LLVM -> terminfo
 project(clang-struct VERSION 1.0.0 LANGUAGES C CXX)
@@ -23,7 +23,7 @@ message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 
 find_package(PkgConfig REQUIRED)
 
-pkg_check_modules(SQLITE3 REQUIRED sqlite3)
+pkg_check_modules(MARIADB REQUIRED libmariadb)
 
 enable_testing()
 
