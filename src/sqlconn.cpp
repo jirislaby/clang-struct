@@ -111,6 +111,21 @@ int SQLConn::openDB(const std::string &host, const unsigned int &port)
 		}
 	}
 
+	static const std::vector<std::pair<const char *, const char *>> create_indices {
+		{ "idx_source_src", "source(src)" }, // only hash is autocreated, but not useful
+	};
+
+	for (auto c: create_indices) {
+		std::ostringstream ss;
+		ss << "CREATE INDEX IF NOT EXISTS " << c.first << " ON " << c.second << ";";
+		ret = mysql_query(sqlHolder, ss.str().c_str());
+		if (ret) {
+			std::cerr << "db CREATE failed (" << __LINE__ << "): " <<
+					mysql_error(sqlHolder) << "\n\t" << ss.str() << "\n";
+			return -1;
+		}
+	}
+
 	static const std::vector<std::pair<const char *, const char *>> create_triggers {
 		{ "TRIG_use_A_INS AFTER INSERT ON `use`", "UPDATE member SET uses = uses+1, "
 			"loads = loads + (NEW.load <=> TRUE), "
@@ -239,7 +254,7 @@ int SQLConn::prepDB()
 				"struct.begLine=? AND "
 				"struct.begCol=? AND "
 				"source.src=? "
-				"FOR UPDATE INTO @member_id;");
+				"LOCK IN SHARE MODE INTO @member_id;");
 	if (!insUseMem)
 		return -1;
 
@@ -517,6 +532,8 @@ void SQLConn::addUse(const Use &use)
 		},
 	};
 
+	if (begin())
+		return;
 	if (bindAndExec(insUseMem, bindUseMem, __LINE__))
 		std::cerr <<
 			     "mem=" << use.member << ", " <<
@@ -526,4 +543,5 @@ void SQLConn::addUse(const Use &use)
 			     "strCol=" << use.strCol <<
 			     "\n";
 	bindAndExec(insUse, bindUse, __LINE__);
+	end();
 }
