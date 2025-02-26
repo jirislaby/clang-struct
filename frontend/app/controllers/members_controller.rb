@@ -1,5 +1,6 @@
 class MembersController < ApplicationController
   def index
+    @title = 'Members'
     order_dir = ''
     if params[:order_dir] == 'desc'
       order_dir = 'DESC';

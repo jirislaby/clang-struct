@@ -10,6 +10,7 @@ class UsesController < ApplicationController
   def show
     @member = Member.joins(:struct).find(params[:id])
     @uses = Use.where(member: @member).left_joins(:run)
+    @title = @member.struct.name + '.' + @member.name + ' uses'
 
     case params[:access]
     when 'load'

@@ -1,5 +1,6 @@
 class StructsController < ApplicationController
   def index
+    @title = 'Structures'
     order_dir = ''
     if params[:order_dir] == 'desc'
       order_dir = 'DESC';
@@ -53,6 +54,7 @@ class StructsController < ApplicationController
 
   def show
     @struct = MyStruct.left_joins(:source).select('struct.*', 'source.src AS src_file').find(params[:id])
+    @title = @struct.name + (@struct.type == 's' ? ' (struct)' : ' (union)')
     base = Member.left_joins(:struct).select('member.id', 'member.struct', 'struct.src', 'member.begLine', 'member.begCol', '0').where(:struct => params[:id])
     #recursive =
     @members = Member.find_by_sql(<<SQL
