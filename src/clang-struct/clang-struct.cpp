@@ -311,7 +311,7 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 	else if (RD->isUnion())
 		type = "u";
 	else {
-		llvm::errs() << "unnamed attribute in:\n";
+		llvm::errs() << src << ": unknown RD type:\n";
 		RD->dumpColor();
 		return;
 	}
