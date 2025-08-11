@@ -321,9 +321,12 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 	bool packed = false;
 	for (const auto &f : RD->attrs()) {
 		// implicit attrs don't have names
+		// so VisibilityAttr do not
 		if (!f->getAttrName()) {
-			if (!f->isImplicit()) {
-				llvm::errs() << "unnamed attribute in:\n";
+			if (!f->isImplicit() && !llvm::isa<VisibilityAttr>(f)) {
+				llvm::errs() << src << ": unnamed attribute: ";
+				f->printPretty(llvm::errs(), RD->getASTContext().getPrintingPolicy());
+				llvm::errs() << " in:\n";
 				RD->dumpColor();
 			}
 			continue;
