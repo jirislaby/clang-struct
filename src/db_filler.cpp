@@ -19,10 +19,12 @@
 
 using Clr = SlHelpers::Color;
 
+namespace {
+
 volatile std::sig_atomic_t stop;
 
-static Server server;
-static SQLConn sqlConn;
+Server server;
+SQLConn sqlConn;
 
 void sig(int sig)
 {
@@ -32,12 +34,14 @@ void sig(int sig)
 		_exit(EXIT_FAILURE);
 }
 
-static void usage(const char *exe, const struct option longopts[])
+void usage(const char *exe, const struct option longopts[])
 {
 	std::cerr << "Options of " << exe << "\n";
 	for (auto &opt = longopts; opt->name; opt++)
 		std::cerr << "\t" << opt->name << "\n";
 }
+
+} // namespace
 
 int main(int argc, char **argv)
 {
