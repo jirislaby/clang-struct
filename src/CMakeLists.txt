@@ -10,10 +10,9 @@ add_executable(db_filler
 	server.h
 	sqlconn.cpp
 	sqlconn.h
-	sqlite.h
 	Message.h
 	)
-target_link_libraries(db_filler ${SQLITE3_LIBRARIES})
+target_link_libraries(db_filler ${SLSQLITE_LIBRARIES})
 install(TARGETS db_filler)
 endif()
 

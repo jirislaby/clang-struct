@@ -23,7 +23,8 @@ message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 
 find_package(PkgConfig REQUIRED)
 
-pkg_check_modules(SQLITE3 REQUIRED sqlite3)
+pkg_check_modules(SLSQLITE REQUIRED slsqlite++)
+pkg_check_modules(SLHELPERS REQUIRED slhelpers++)
 
 enable_testing()
 

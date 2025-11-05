@@ -33,14 +33,14 @@ public:
 #ifdef STANDALONE
 class SQLConnection : public Connection {
 public:
-	SQLConnection(const std::string &dbFile) : Connection(), dbFile(dbFile) {}
+	SQLConnection(std::filesystem::path dbFile) : Connection(), dbFile(std::move(dbFile)) {}
 
 	virtual int open();
 	virtual void write(const Msg &msg);
 
 private:
-	const std::string dbFile;
-	SQLConn<std::string> sql;
+	std::filesystem::path dbFile;
+	SQLConn sql;
 };
 #else
 class MQConnection : public Connection {
@@ -106,7 +106,11 @@ private:
 #ifdef STANDALONE
 int SQLConnection::open()
 {
-	return sql.open(dbFile);
+	if (!sql.open(dbFile)) {
+		llvm::errs() << "cannot open db: " << sql.lastError() << '\n';
+		return -1;
+	}
+	return 0;
 }
 
 void SQLConnection::write(const Msg &msg)

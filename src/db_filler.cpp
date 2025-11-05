@@ -12,17 +12,17 @@
 //#include <sys/un.h>
 #include <sys/stat.h>
 
-#include <sqlite3.h>
+#include <sl/helpers/Color.h>
 
 #include "server.h"
 #include "sqlconn.h"
 
+using Clr = SlHelpers::Color;
+
 volatile std::sig_atomic_t stop;
 
-using SQLConnection = SQLConn<std::string_view>;
-
 static Server server;
-static SQLConnection sqlConn;
+static SQLConn sqlConn;
 
 void sig(int sig)
 {
@@ -70,12 +70,16 @@ int main(int argc, char **argv)
 	if (server.open() < 0)
 		return EXIT_FAILURE;
 
-	if (sqlConn.open() < 0)
+	if (!sqlConn.open()) {
+		Clr(std::cerr, Clr::RED) << sqlConn.lastError();
 		return EXIT_FAILURE;
-	if (!autocommit && sqlConn.begin() < 0)
+	}
+	if (!autocommit && !sqlConn.begin()) {
+		Clr(std::cerr, Clr::RED) << sqlConn.lastError();
 		return EXIT_FAILURE;
+	}
 
-	SQLConnection::Msg msg;
+	Message<std::string_view> msg;
 	bool should_commit = false;
 
 	while (true) {
@@ -86,7 +90,7 @@ int main(int argc, char **argv)
 		if (msgStr->empty()) {
 			if (should_commit) {
 				std::cerr << "commiting\n";
-				if (sqlConn.end() < 0 || sqlConn.begin() < 0)
+				if (!sqlConn.end() || !sqlConn.begin())
 					return EXIT_FAILURE;
 				should_commit = false;
 			}
@@ -103,7 +107,7 @@ int main(int argc, char **argv)
 
 	if (!autocommit) {
 		std::cerr << "commiting\n";
-		if (sqlConn.end() < 0)
+		if (!sqlConn.end())
 			return EXIT_FAILURE;
 	}
 	std::cerr << "bye\n";
