@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5.0)
+cmake_minimum_required(VERSION 3.10.0)
 
 # C needed for LLVM -> terminfo
 project(clang-struct VERSION 1.0.0 LANGUAGES C CXX)
