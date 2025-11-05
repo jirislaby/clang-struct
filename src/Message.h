@@ -31,21 +31,21 @@ public:
 	Message() : Message(KIND::INVALID) { }
 	Message(const KIND &kind) : kind(kind) { entries.reserve(10); }
 
-	void add(const TYPE &type, const T &key, const T &val) {
-		entries.push_back(std::make_tuple(type, key, val));
+	void add(TYPE type, T key, T val) {
+		entries.emplace_back(std::move(type), std::move(key), std::move(val));
 	}
 
-	void add(const T &key, const T &val) {
-		add(TEXT, key, val);
+	void add(T key, T val) {
+		add(TEXT, std::move(key), std::move(val));
 	}
 
-	void add(const T &key) {
-		add(NUL, key, "");
+	void add(T key) {
+		add(NUL, std::move(key), "");
 	}
 
 	template<typename U>
-	void add(const T &key, U val) {
-		add(INT, key, std::to_string(val));
+	void add(T key, U val) {
+		add(INT, std::move(key), std::to_string(val));
 	}
 
 	void renew(const KIND &kind) {
@@ -55,7 +55,9 @@ public:
 
 	KIND getKind() const { return kind; }
 	size_t size() const { return entries.size(); }
-	entry operator[](int idx) const { return entries[idx]; }
+	typename storage::const_reference operator[](typename storage::size_type idx) const {
+		return entries[idx];
+	}
 	typename storage::const_iterator begin() const { return entries.begin(); }
 	typename storage::const_iterator end() const { return entries.end(); }
 
