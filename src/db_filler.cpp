@@ -1,11 +1,8 @@
 #include <csignal>
-#include <cstring>
+#include <cxxopts.hpp>
 #include <iostream>
-#include <optional>
 
 #include <fcntl.h>
-#include <getopt.h>
-#include <time.h>
 #include <unistd.h>
 
 //#include <sys/socket.h>
@@ -34,13 +31,6 @@ void sig(int sig)
 		_exit(EXIT_FAILURE);
 }
 
-void usage(const char *exe, const struct option longopts[])
-{
-	std::cerr << "Options of " << exe << "\n";
-	for (auto &opt = longopts; opt->name; opt++)
-		std::cerr << "\t" << opt->name << "\n";
-}
-
 } // namespace
 
 int main(int argc, char **argv)
@@ -49,26 +39,27 @@ int main(int argc, char **argv)
 	signal(SIGINT, sig);
 	signal(SIGTERM, sig);
 
-	static const struct option longopts[] = {
-		{ "autocommit", 0, NULL, 'a' },
-		{ "unlink", 0, NULL, 'u' },
-		{}
-	};
 	bool autocommit = false;
-	int opt;
+	cxxopts::Options options { argv[0], "Fill in structs.db" };
+	options.add_options()
+		("h,help", "Print this help message")
+		("a,autocommit", "Autocommit instead of transactions",
+		 cxxopts::value(autocommit)->default_value("false"))
+		("u,unlink", "Unlink the queue before any other work")
+	;
 
-	while ((opt = getopt_long(argc, argv, "au", longopts, NULL)) != -1) {
-		switch (opt) {
-		case 'a':
-			autocommit = true;
-			break;
-		case 'u':
-			server.unlink();
-			break;
-		default:
-			usage(argv[0], longopts);
-			return EXIT_FAILURE;
+	try {
+		const auto opts = options.parse(argc, argv);
+		if (opts.contains("help")) {
+			std::cout << options.help();
+			return 0;
 		}
+		if (opts.contains("unlink"))
+			server.unlink();
+	} catch (const cxxopts::exceptions::parsing &e) {
+		Clr(std::cerr, Clr::RED) << "arguments error: " << e.what();
+		std::cerr << options.help();
+		return EXIT_FAILURE;
 	}
 
 	if (server.open() < 0)

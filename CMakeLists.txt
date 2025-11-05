@@ -21,8 +21,9 @@ include(AddLLVM)
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 
-find_package(PkgConfig REQUIRED)
+find_package(cxxopts REQUIRED)
 
+find_package(PkgConfig REQUIRED)
 pkg_check_modules(SLSQLITE REQUIRED slsqlite++)
 pkg_check_modules(SLHELPERS REQUIRED slhelpers++)
 
