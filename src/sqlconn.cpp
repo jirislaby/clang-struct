@@ -118,23 +118,20 @@ bool SQLConn::createDB()
 
 bool SQLConn::prepDB()
 {
-	return	prepareStatement("INSERT INTO source(run, src) "
-				 "VALUES (:run, :src);",
-				 insSrc) &&
-		prepareStatement("INSERT INTO "
-				 "struct(run, type, name, attrs, packed, inMacro, src, begLine, begCol, endLine, endCol) "
-				 "SELECT :run, :type, :name, :attrs, :packed, :inMacro, id, :begLine, :begCol, :endLine, :endCol "
-					"FROM source WHERE src=:src;",
-				 insStr) &&
-		prepareStatement("INSERT INTO "
+	const Statements stmts {
+		{ insSrc, "INSERT INTO source(run, src) VALUES (:run, :src);" },
+		{ insStr, "INSERT INTO "
+				"struct(run, type, name, attrs, packed, inMacro, src, begLine, begCol, endLine, endCol) "
+				"SELECT :run, :type, :name, :attrs, :packed, :inMacro, id, :begLine, :begCol, :endLine, :endCol "
+					"FROM source WHERE src=:src;" },
+		{ insMem, "INSERT INTO "
 				 "member(run, name, struct, begLine, begCol, endLine, endCol) "
 				 "SELECT :run, :name, struct.id, :begLine, :begCol, :endLine, :endCol "
 					"FROM struct LEFT JOIN source ON struct.src=source.id "
 					"WHERE source.src=:src AND "
 					"begLine=:strBegLine AND begCol=:strBegCol AND "
-					"name=:struct;",
-				 insMem) &&
-		prepareStatement("INSERT INTO "
+					"name=:struct;" },
+		{ insUse, "INSERT INTO "
 				 "use(run, member, src, begLine, begCol, endLine, endCol, load, implicit) "
 				 "SELECT :run, (SELECT member.id FROM member "
 						"LEFT JOIN struct ON member.struct=struct.id "
@@ -145,8 +142,9 @@ bool SQLConn::prepDB()
 						"struct.begLine=:strLine AND "
 						"struct.begCol=:strCol), "
 					"(SELECT id FROM source WHERE src=:use_src), "
-					":begLine, :begCol, :endLine, :endCol, :load, :implicit;",
-				 insUse);
+					":begLine, :begCol, :endLine, :endCol, :load, :implicit;" },
+	};
+	return prepareStatements(stmts);
 }
 
 template <typename T>
