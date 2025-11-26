@@ -1,9 +1,0 @@
-name: GitHub push to OBS
-on: [push]
-jobs:
-  push-to-obs:
-    runs-on: ubuntu-latest
-    steps:
-      - run: 'curl --fail-with-body -H "Authorization: Token ${{ secrets.OBS_TOKEN }}" -X POST "https://api.opensuse.org/trigger/runservice?project=home:jirislaby&package=${GITHUB_REPOSITORY#*/}"'
-        env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
