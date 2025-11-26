@@ -122,27 +122,29 @@ bool SQLConn::prepDB()
 		{ insSrc, "INSERT INTO source(run, src) VALUES (:run, :src);" },
 		{ insStr, "INSERT INTO "
 				"struct(run, type, name, attrs, packed, inMacro, src, begLine, begCol, endLine, endCol) "
-				"SELECT :run, :type, :name, :attrs, :packed, :inMacro, id, :begLine, :begCol, :endLine, :endCol "
-					"FROM source WHERE src=:src;" },
+				"VALUES (:run, :type, :name, :attrs, :packed, :inMacro, "
+				"(SELECT id FROM source WHERE src=:src), "
+				":begLine, :begCol, :endLine, :endCol);" },
 		{ insMem, "INSERT INTO "
-				 "member(run, name, struct, begLine, begCol, endLine, endCol) "
-				 "SELECT :run, :name, struct.id, :begLine, :begCol, :endLine, :endCol "
-					"FROM struct LEFT JOIN source ON struct.src=source.id "
-					"WHERE source.src=:src AND "
-					"begLine=:strBegLine AND begCol=:strBegCol AND "
-					"name=:struct;" },
+				"member(run, name, struct, begLine, begCol, endLine, endCol) "
+				"VALUES (:run, :name, "
+				"(SELECT id "
+				  "FROM struct "
+				  "WHERE src = (SELECT id FROM source WHERE src = :src) AND "
+				  "begLine = :strBegLine AND begCol = :strBegCol AND "
+				  "name = :struct), "
+				":begLine, :begCol, :endLine, :endCol);" },
 		{ insUse, "INSERT INTO "
-				 "use(run, member, src, begLine, begCol, endLine, endCol, load, implicit) "
-				 "SELECT :run, (SELECT member.id FROM member "
-						"LEFT JOIN struct ON member.struct=struct.id "
-						"LEFT JOIN source ON struct.src=source.id "
-						"WHERE member.name=:member AND "
-						"struct.name=:struct AND "
-						"source.src=:strSrc AND "
-						"struct.begLine=:strLine AND "
-						"struct.begCol=:strCol), "
-					"(SELECT id FROM source WHERE src=:use_src), "
-					":begLine, :begCol, :endLine, :endCol, :load, :implicit;" },
+				"use(run, member, src, begLine, begCol, endLine, endCol, load, implicit) "
+				"VALUES (:run, "
+				  "(SELECT id FROM member "
+				    "WHERE name = :member AND "
+				    "struct = (SELECT id FROM struct "
+					"WHERE name = :struct AND begLine = :strLine AND "
+					"begCol = :strCol AND "
+					"src = (SELECT id FROM source WHERE src = :strSrc))), "
+				  "(SELECT id FROM source WHERE src = :use_src), "
+				":begLine, :begCol, :endLine, :endCol, :load, :implicit);" },
 	};
 	return prepareStatements(stmts);
 }
