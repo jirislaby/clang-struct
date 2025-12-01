@@ -3,17 +3,9 @@ set(LLVM_LINK_COMPONENTS core support)
 #add_definitions(${LLVM_DEFINITIONS})
 #include_directories(${LLVM_INCLUDE_DIRS})
 
-if (NOT ONLY_STANDALONE)
-add_executable(db_filler
-	db_filler.cpp
-	server.cpp
-	server.h
+add_llvm_library(clang-struct MODULE
+	clang-struct.cpp
+	Lock.cpp
 	sqlconn.cpp
-	sqlconn.h
-	Message.h
+	LINK_LIBS ${SLSQLITE_LIBRARIES}
 	)
-target_link_libraries(db_filler ${SLSQLITE_LIBRARIES})
-install(TARGETS db_filler)
-endif()
-
-add_subdirectory(clang-struct)
