@@ -8,62 +8,16 @@
 #include "clang/StaticAnalyzer/Core/PathSensitive/AnalysisManager.h"
 #include "clang/StaticAnalyzer/Frontend/CheckerRegistry.h"
 
-#include "../Message.h"
-
-#ifdef STANDALONE
-#include "../sqlconn.h"
-#else
-#include <fcntl.h>
-#include <mqueue.h>
-
-#include <sys/stat.h>
-#endif
+#include "Lock.h"
+#include "sqlconn.h"
 
 using namespace clang;
 using namespace clang::ast_matchers;
 using namespace clang::ento;
 using namespace ClangStruct;
-using Msg = Message<std::string>;
-
-class Connection {
-public:
-	Connection() {}
-
-	virtual int open() = 0;
-	virtual void write(const Msg &msg) = 0;
-};
-
-#ifdef STANDALONE
-class SQLConnection : public Connection {
-public:
-	SQLConnection(std::filesystem::path dbFile) : Connection(), dbFile(std::move(dbFile)) {}
-
-	virtual int open();
-	virtual void write(const Msg &msg);
-
-private:
-	std::filesystem::path dbFile;
-	SQLConn sql;
-};
-#else
-class MQConnection : public Connection {
-public:
-	MQConnection() : Connection() {}
-	~MQConnection();
-
-	virtual int open();
-	virtual void write(const Msg &msg);
-
-private:
-#if 0
-	int sock = -1;
-#else
-	mqd_t mq = -1;
-#endif
-};
-#endif
 
 namespace {
+
 class MyChecker final : public Checker<check::EndOfTranslationUnit> {
 public:
   void checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
@@ -72,16 +26,13 @@ public:
 
 class MatchCallback : public MatchFinder::MatchCallback {
 public:
-	MatchCallback(SourceManager &SM, Connection &conn, int runId,
-		      std::filesystem::path &basePath) :
-		SM(SM), conn(conn), runId(runId), basePath(basePath) { }
+	MatchCallback(SourceManager &SM, const SQLConn &conn, std::filesystem::path &basePath) :
+		SM(SM), conn(conn), basePath(basePath) { }
 
 	void run(const MatchFinder::MatchResult &res);
 private:
-	void bindLoc(Msg &msg, const SourceRange &SR);
+	void bindLoc(SQLConn::Location &loc, const SourceRange &SR);
 	std::string getSrc(const SourceLocation &SLOC);
-	void addRun(Msg &msg);
-	void addSrc(Msg &msg, const std::string &src);
 
 	void handleUse(const SourceRange &initSR, const NamedDecl *ND, const RecordDecl *RD,
 		       int load, bool implicit);
@@ -97,8 +48,7 @@ private:
 
 	SourceManager &SM;
 
-	Connection &conn;
-	int runId;
+	const SQLConn &conn;
 	std::filesystem::path &basePath;
 	std::set<const MemberExpr *> visited;
 	std::set<std::string> sources;
@@ -106,93 +56,12 @@ private:
 
 }
 
-#ifdef STANDALONE
-int SQLConnection::open()
+void MatchCallback::bindLoc(SQLConn::Location &loc, const SourceRange &SR)
 {
-	if (!sql.open(dbFile)) {
-		llvm::errs() << "cannot open db: " << sql.lastError() << '\n';
-		return -1;
-	}
-	return 0;
-}
-
-void SQLConnection::write(const Msg &msg)
-{
-	sql.handleMessage(msg);
-}
-
-#else
-MQConnection::~MQConnection()
-{
-#if 0
-	if (sock >= 0)
-		close(sock);
-#else
-	if (mq >= 0)
-		mq_close(mq);
-#endif
-}
-
-int MQConnection::open()
-{
-#if 0
-	sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
-	if (sock < 0) {
-		llvm::errs() << "cannot create socket: " << strerror(errno) << "\n";
-		return -1;
-	}
-
-	struct sockaddr_un addr = {
-		.sun_family = AF_UNIX,
-		.sun_path = "db_filler",
-	};
-
-	int ret = connect(sock, (const struct sockaddr *)&addr, sizeof(addr));
-	if (ret < 0) {
-		llvm::errs() << "cannot connect: " << strerror(errno) << "\n";
-		return -1;
-	}
-#else
-	mq = mq_open("/db_filler", O_WRONLY,  0600, NULL);
-	if (mq < 0) {
-		llvm::errs() << "cannot open msg queue: " << strerror(errno) << "\n";
-		return -1;
-	}
-#endif
-
-	return 0;
-}
-
-void MQConnection::write(const Msg &msg)
-{
-#if 0
-	auto ret = ::write(sock, msg.c_str(), msg.length());
-	if (ret < 0) {
-		llvm::errs() << "write: " << strerror(errno) << "\n";
-		return;
-	}
-
-	if ((size_t)ret != msg.length())
-		llvm::errs() << "stray write: " << ret << "/" << msg.length() << "\n";
-#else
-	auto msgStr = msg.serialize();
-
-	//std::cerr << "sending: " << msg << "\n";
-
-	if (mq_send(mq, msgStr.c_str(), msgStr.length(), 0) < 0) {
-		llvm::errs() << "mq_send: " << strerror(errno) << "\n";
-		return;
-	}
-#endif
-}
-#endif
-
-void MatchCallback::bindLoc(Msg &msg, const SourceRange &SR)
-{
-	msg.add("begLine", SM.getPresumedLineNumber(SR.getBegin()));
-	msg.add("begCol", SM.getPresumedColumnNumber(SR.getBegin()));
-	msg.add("endLine", SM.getPresumedLineNumber(SR.getEnd()));
-	msg.add("endCol", SM.getPresumedColumnNumber(SR.getEnd()));
+	loc.begLine = SM.getPresumedLineNumber(SR.getBegin());
+	loc.begCol = SM.getPresumedColumnNumber(SR.getBegin());
+	loc.endLine = SM.getPresumedLineNumber(SR.getEnd());
+	loc.endCol = SM.getPresumedColumnNumber(SR.getEnd());
 }
 
 std::string MatchCallback::getSrc(const SourceLocation &SLOC)
@@ -211,53 +80,31 @@ std::string MatchCallback::getSrc(const SourceLocation &SLOC)
 	return p.string();
 }
 
-void MatchCallback::addRun(Msg &msg)
-{
-	if (runId >= 0)
-		msg.add("run", runId);
-	else
-		msg.add("run");
-}
-
-void MatchCallback::addSrc(Msg &msg, const std::string &src)
-{
-	if (!sources.insert(src).second)
-		return;
-
-	msg.renew(Msg::KIND::SOURCE);
-
-	addRun(msg);
-	msg.add("src", src);
-	conn.write(msg);
-}
-
 void MatchCallback::handleUse(const SourceRange &initSR, const NamedDecl *ND, const RecordDecl *RD,
 			      int load, bool implicit)
 {
 	auto strLoc = RD->getBeginLoc();
 	auto strSrc = getSrc(strLoc);
 	auto useSrc = getSrc(initSR.getBegin());
-	Msg msg;
 
-	addSrc(msg, useSrc);
+	SQLConn::Use use {
+		.src = useSrc,
+		.load = load,
+		.implicit = implicit,
+		.strSrc = strSrc,
+		.str = {
+			.name = getRDName(RD),
+			.line = SM.getPresumedLineNumber(strLoc),
+			.col = SM.getPresumedColumnNumber(strLoc),
+		},
+		.member = getNDName(ND),
+	};
 
-	msg.renew(Msg::KIND::USE);
-	addRun(msg);
-	msg.add("member", getNDName(ND));
-	msg.add("struct", getRDName(RD));
-	msg.add("strSrc", strSrc);
-	msg.add("strLine", SM.getPresumedLineNumber(strLoc));
-	msg.add("strCol", SM.getPresumedColumnNumber(strLoc));
-	msg.add("use_src", useSrc);
-	if (load < 0)
-		msg.add("load");
-	else
-		msg.add("load", load);
-	msg.add("implicit", implicit);
-
-	bindLoc(msg, initSR);
-
-	conn.write(msg);
+	bindLoc(use.loc, initSR);
+	if (!conn.insertUseTemp(use)) {
+		llvm::errs() << __func__ << ": cannot insert use: " << conn.lastError() << '\n';
+		return;
+	}
 }
 
 void MatchCallback::handleME(const MemberExpr *ME, int store)
@@ -308,13 +155,6 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 	auto RDSR = RD->getSourceRange();
 	auto RDName = getRDName(RD);
 	auto src = getSrc(RDSR.getBegin());
-	Msg msg;
-
-	addSrc(msg, src);
-
-	msg.renew(Msg::KIND::STRUCT);
-	addRun(msg);
-	msg.add("name", RDName);
 
 	std::string type;
 	if (RD->isStruct())
@@ -351,29 +191,42 @@ void MatchCallback::handleRD(const RecordDecl *RD)
 		cont = true;
 	}
 
-	msg.add("type", type);
-	msg.add("attrs", ss.str());
-	msg.add("packed", packed);
-	msg.add("inMacro", RDSR.getBegin().isMacroID());
-	msg.add("src", src);
-	bindLoc(msg, RDSR);
-	conn.write(msg);
+	SQLConn::Struct str {
+		.name = RDName,
+		.type = type,
+		.attrs = ss.str(),
+		.packed = packed,
+		.inMacro = RDSR.getBegin().isMacroID(),
+		.src = src,
+	};
+
+	bindLoc(str.loc, RDSR);
+	if (!conn.insertStructTemp(str)) {
+		llvm::errs() << __func__ << ": cannot insert struct: " << conn.lastError() << '\n';
+		return;
+	}
 
 	for (const auto &f : RD->fields()) {
 		//f->dumpColor();
 		/*llvm::errs() << __func__ << ": " << RD->getNameAsString() <<
 				"." << f->getNameAsString() << "\n";*/
 		auto SR = f->getSourceRange();
-		msg.renew(Msg::KIND::MEMBER);
-		addRun(msg);
-		msg.add("name", getNDName(f));
-		msg.add("struct", RDName);
-		msg.add("src", src);
-		msg.add("strBegLine", SM.getPresumedLineNumber(RDSR.getBegin()));
-		msg.add("strBegCol", SM.getPresumedColumnNumber(RDSR.getBegin()));
+		SQLConn::Member member {
+			.name = getNDName(f),
+			.src = src,
+			.str = {
+				.name = RDName,
+				.line = SM.getPresumedLineNumber(RDSR.getBegin()),
+				.col = SM.getPresumedColumnNumber(RDSR.getBegin()),
+			},
+		};
 
-		bindLoc(msg, SR);
-		conn.write(msg);
+		bindLoc(member.loc, SR);
+		if (!conn.insertMemberTemp(member)) {
+			llvm::errs() << __func__ << ": cannot insert member: " <<
+					conn.lastError() << '\n';
+			return;
+		}
 	}
 }
 
@@ -465,15 +318,11 @@ void MyChecker::checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
 					  AnalysisManager &A,
 					  BugReporter &BR) const
 {
-#ifdef STANDALONE
-	auto dbFile = A.getAnalyzerOptions().getCheckerStringOption(this, "dbFile");
-	SQLConnection conn(dbFile.str());
-#else
-	MQConnection conn;
-#endif
-
-	if (conn.open() < 0)
+	SQLConn db;
+	if (!db.open()) {
+		llvm::errs() << "cannot open db: " << db.lastError() << '\n';
 		return;
+	}
 
 	//TU->dumpColor();
 
@@ -481,8 +330,10 @@ void MyChecker::checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
 	std::filesystem::path basePath(basePathStr.str());
 	auto runId = A.getAnalyzerOptions().getCheckerIntegerOption(this, "runId");
 
-	MatchCallback CB(A.getSourceManager(), conn, runId, basePath);
+	MatchCallback CB(A.getSourceManager(), db, basePath);
 
+	{
+	const auto &tx = db.beginAuto();
 	MatchFinder FRD;
 	FRD.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, recordDecl().bind("RD")),
 		     &CB);
@@ -511,6 +362,13 @@ void MyChecker::checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
 		     &CB);
 
 	F.matchAST(A.getASTContext());
+	}
+
+	auto dbFile = A.getAnalyzerOptions().getCheckerStringOption(this, "dbFile");
+	// sqlite is very bad at concurrency
+	Lock l;
+	if (!db.move(dbFile.str(), runId))
+		llvm::errs() << "cannot push the data to the db: " << db.lastError() << '\n';
 }
 
 extern "C" void clang_registerCheckers(CheckerRegistry &registry) {
@@ -525,12 +383,10 @@ extern "C" void clang_registerCheckers(CheckerRegistry &registry) {
 			    "basePath", "",
 			    "Path to resolve file paths against (empty = absolute paths)",
 			    "released");
-#ifdef STANDALONE
   registry.addCheckerOption("string", "jirislaby.StructMembersChecker",
 			    "dbFile", "structs.db",
 			    "Name of the database file to store into",
 			    "released");
-#endif
 }
 
 extern "C" const char clang_analyzerAPIVersionString[] =

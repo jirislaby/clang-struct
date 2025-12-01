@@ -143,12 +143,6 @@ sub stop() {
 $SIG{'INT'} = \&stop;
 $SIG{'TERM'} = \&stop;
 
-my $daemon = fork();
-if (!$daemon) {
-	exec('db_filler');
-	die;
-}
-
 my $start_time = time;
 my $period = $start_time;
 my $counter = 0;
@@ -208,8 +202,5 @@ foreach my $entry (@{$json}) {
 print STDERR "Done, waiting for ", scalar $pm->running_procs, " children\n";
 
 $pm->wait_all_children;
-
-kill 'TERM', $daemon;
-wait;
 
 1;

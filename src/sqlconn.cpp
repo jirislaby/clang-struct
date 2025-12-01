@@ -1,13 +1,105 @@
 // SPDX-License-Identifier: GPL-2.0-only
 
-#include <charconv>
-#include <iostream>
-
 #include "sqlconn.h"
 
 using namespace ClangStruct;
 
 bool SQLConn::createDB()
+{
+	static const Tables tables {
+		{ "structTemp", {
+			"type TEXT NOT NULL CHECK(type IN ('s', 'u'))",
+			"name TEXT NOT NULL",
+			"attrs TEXT",
+			"packed INTEGER NOT NULL CHECK(packed IN (0, 1))",
+			"inMacro INTEGER NOT NULL CHECK(inMacro IN (0, 1))",
+			"src TEXT NOT NULL",
+			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL",
+			"endLine INTEGER, endCol INTEGER",
+		}},
+		{ "memberTemp", {
+			"name TEXT NOT NULL",
+			"src TEXT NOT NULL",
+			"struct TEXT NOT NULL",
+			"strBegLine INTEGER NOT NULL, strBegCol INTEGER NOT NULL",
+			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL",
+			"endLine INTEGER, endCol INTEGER",
+		}},
+		{ "useTemp", {
+			"src TEXT NOT NULL",
+			"load INTEGER CHECK(load IN (0, 1))",
+			"implicit INTEGER NOT NULL CHECK(implicit IN (0, 1))",
+			"strSrc TEXT NOT NULL",
+			"struct TEXT NOT NULL",
+			"strBegLine INTEGER NOT NULL, strBegCol INTEGER NOT NULL",
+			"member TEXT NOT NULL",
+			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL",
+			"endLine INTEGER, endCol INTEGER",
+		}},
+	};
+	return createTables(tables);
+}
+
+bool SQLConn::prepDB()
+{
+	const Statements stmts {
+		{ insStrTemp, "INSERT INTO structTemp(type, name, attrs, packed, inMacro, src, "
+				"begLine, begCol, endLine, endCol) "
+			      "VALUES (:type, :name, :attrs, :packed, :inMacro, :src, "
+				":begLine, :begCol, :endLine, :endCol);" },
+		{ insMemTemp, "INSERT INTO memberTemp(name, src, struct, strBegLine, strBegCol, "
+				"begLine, begCol, endLine, endCol) "
+			      "VALUES (:name, :src, :str, :strBegLine, :strBegCol, "
+				":begLine, :begCol, :endLine, :endCol);" },
+		{ insUseTemp, "INSERT INTO useTemp(src, load, implicit, strSrc, "
+				"struct, strBegLine, strBegCol, member, "
+				"begLine, begCol, endLine, endCol) "
+			      "VALUES (:src, :load, :implicit, :strSrc, "
+				":str, :strBegLine, :strBegCol, :member, "
+				":begLine, :begCol, :endLine, :endCol);" },
+	};
+
+	return prepareStatements(stmts);
+}
+
+bool SQLConn::prepReal()
+{
+	const Statements stmts {
+		{ moveSrc, "INSERT INTO source(run, src) "
+			   "SELECT :run, src FROM structTemp "
+			   "WHERE true ON CONFLICT DO NOTHING;" },
+		{ moveStr, "INSERT INTO struct(run, type, name, attrs, packed, inMacro, src, "
+			     "begLine, begCol, endLine, endCol) "
+			   "SELECT :run, type, name, attrs, packed, inMacro, source.id, "
+			     "begLine, begCol, endLine, endCol "
+			     "FROM structTemp "
+			     "JOIN source ON structTemp.src = source.src AND source.run IS :run "
+			   "WHERE true ON CONFLICT DO NOTHING;" },
+		{ moveMem, "INSERT INTO member(run, name, struct, begLine, begCol, endLine, endCol) "
+			   "SELECT :run, mem.name, struct.id, mem.begLine, mem.begCol, "
+			     "mem.endLine, mem.endCol "
+			   "FROM memberTemp AS mem "
+			   "JOIN source ON source.run IS :run AND mem.src = source.src "
+			   "JOIN struct ON struct.run IS :run AND struct.src = source.id AND "
+			     "struct.name = struct AND "
+			     "struct.begLine = strBegLine AND struct.begCol = strBegCol "
+			   "WHERE true ON CONFLICT DO NOTHING;" },
+		{ moveUse, "INSERT INTO use(run, member, src, load, implicit, "
+			     "begLine, begCol, endLine, endCol) "
+			   "SELECT :run, member.id, source.id, use.load, use.implicit, "
+			     "use.begLine, use.begCol, use.endLine, use.endCol "
+			   "FROM useTemp AS use "
+			   "JOIN source ON source.run IS :run AND use.src = source.src "
+			   "JOIN member ON member.run IS :run AND member.name = use.member "
+			   "JOIN struct ON struct.run IS :run AND struct.name = use.struct AND "
+			     "struct.begLine = use.strBegLine AND struct.begCol = use.strBegCol AND "
+			     "struct.src = (SELECT id FROM source WHERE src = use.strSrc) "
+			   "WHERE true ON CONFLICT DO NOTHING;" },
+	};
+	return prepareStatements(stmts);
+}
+
+bool SQLConnReal::createDB()
 {
 	static const Tables tables {
 		{ "run", {
@@ -58,11 +150,11 @@ bool SQLConn::createDB()
 			"run INTEGER REFERENCES run(id) ON DELETE CASCADE",
 			"member INTEGER NOT NULL REFERENCES member(id) ON DELETE CASCADE",
 			"src INTEGER NOT NULL REFERENCES source(id) ON DELETE CASCADE",
-			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL",
-			"endLine INTEGER, endCol INTEGER",
 			"load INTEGER CHECK(load IN (0, 1))",
 			"implicit INTEGER NOT NULL CHECK(implicit IN (0, 1))",
-			"UNIQUE(member, src, begLine)",
+			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL",
+			"endLine INTEGER, endCol INTEGER",
+			"UNIQUE(member, src, begLine, begCol)",
 			"CHECK(endLine >= begLine)",
 		}},
 	};
@@ -119,109 +211,3 @@ bool SQLConn::createDB()
 
 	return createTables(tables) && createTriggers(triggers) && createViews(views);
 }
-
-bool SQLConn::prepDB()
-{
-	const Statements stmts {
-		{ insSrc, "INSERT INTO source(run, src) VALUES (:run, :src);" },
-		{ insStr, "INSERT INTO "
-				"struct(run, type, name, attrs, packed, inMacro, src, begLine, begCol, endLine, endCol) "
-				"VALUES (:run, :type, :name, :attrs, :packed, :inMacro, "
-				"(SELECT id FROM source WHERE src=:src), "
-				":begLine, :begCol, :endLine, :endCol);" },
-		{ insMem, "INSERT INTO "
-				"member(run, name, struct, begLine, begCol, endLine, endCol) "
-				"VALUES (:run, :name, "
-				"(SELECT id "
-				  "FROM struct "
-				  "WHERE src = (SELECT id FROM source WHERE src = :src) AND "
-				  "begLine = :strBegLine AND begCol = :strBegCol AND "
-				  "name = :struct), "
-				":begLine, :begCol, :endLine, :endCol);" },
-		{ insUse, "INSERT INTO "
-				"use(run, member, src, begLine, begCol, endLine, endCol, load, implicit) "
-				"VALUES (:run, "
-				  "(SELECT id FROM member "
-				    "WHERE name = :member AND "
-				    "struct = (SELECT id FROM struct "
-					"WHERE name = :struct AND begLine = :strLine AND "
-					"begCol = :strCol AND "
-					"src = (SELECT id FROM source WHERE src = :strSrc))), "
-				  "(SELECT id FROM source WHERE src = :use_src), "
-				":begLine, :begCol, :endLine, :endCol, :load, :implicit);" },
-	};
-	return prepareStatements(stmts);
-}
-
-template <typename T>
-int SQLConn::bindAndStep(SlSqlite::SQLStmtHolder &ins, const Message<T> &msg)
-{
-	using Msg = Message<T>;
-	SlSqlite::SQLStmtResetter insSrcResetter(sqlHolder, ins);
-
-	for (auto e: msg) {
-		const auto [type, key, val] = e;
-
-		std::string bindKey(":");
-		bindKey.append(key);
-
-		bool ret;
-		if (type == Msg::TYPE::TEXT) {
-			ret = bind(ins, bindKey, val, true);
-		} else if (type == Msg::TYPE::INT) {
-			auto end = val.data() + val.size();
-			int i;
-			auto res = std::from_chars(val.data(), end, i);
-			if (res.ptr != end) {
-				std::cerr << "bad int val=\"" << val << "\"\n";
-				return -1;
-			}
-			ret = bind(ins, bindKey, i);
-		} else if (type == Msg::TYPE::NUL) {
-			ret = bind(ins, bindKey, std::monostate());
-		} else {
-			std::cerr << "bad type: " << msg << "\n";
-			abort();
-		}
-
-		if (!ret) {
-			std::cerr << lastError() << '\n';
-			return -1;
-		}
-	}
-
-	if (!step(ins)) {
-		std::cerr << lastError() << '\n';
-		std::cerr << "\t" << msg << "\n";
-		return -1;
-	}
-
-	return 0;
-}
-
-template <typename T>
-int SQLConn::handleMessage(const Message<T> &msg)
-{
-	using Msg = Message<T>;
-	auto kind = msg.getKind();
-
-	if (kind == Msg::KIND::SOURCE)
-		return bindAndStep(insSrc, msg);
-	if (kind == Msg::KIND::STRUCT)
-		return bindAndStep(insStr, msg);
-	if (kind == Msg::KIND::MEMBER)
-		return bindAndStep(insMem, msg);
-	if (kind == Msg::KIND::USE)
-		return bindAndStep(insUse, msg);
-
-	std::cerr << "bad message kind: " << kind << "\n";
-	std::cerr << "\t" << msg << "\n";
-
-	return -1;
-}
-
-#ifdef STANDALONE
-template int SQLConn::handleMessage(const Message<std::string> &msg);
-#else
-template int SQLConn::handleMessage(const Message<std::string_view> &msg);
-#endif
