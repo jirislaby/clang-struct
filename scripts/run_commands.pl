@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS run(
 	version TEXT,
 	sha TEXT,
 	filter TEXT,
-	config INTEGER REFERENCES config(id),
+	config INTEGER REFERENCES config(id) ON DELETE CASCADE,
 	skip INTEGER NOT NULL CHECK(skip IN (0, 1)),
 	timestamp TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW', 'localtime'))
 ) STRICT;

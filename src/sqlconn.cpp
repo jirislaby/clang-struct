@@ -16,12 +16,12 @@ bool SQLConn::createDB()
 		}},
 		{ "source", {
 			"id INTEGER PRIMARY KEY",
-			"run INTEGER REFERENCES run(id)",
+			"run INTEGER REFERENCES run(id) ON DELETE CASCADE",
 			"src TEXT NOT NULL UNIQUE",
 		}},
 		{ "struct", {
 			"id INTEGER PRIMARY KEY",
-			"run INTEGER REFERENCES run(id)",
+			"run INTEGER REFERENCES run(id) ON DELETE CASCADE",
 			"parent INTEGER REFERENCES struct(id) ON DELETE CASCADE",
 			"type TEXT NOT NULL CHECK(type IN ('s', 'u'))",
 			"name TEXT NOT NULL",
@@ -35,7 +35,7 @@ bool SQLConn::createDB()
 		}},
 		{ "member", {
 			"id INTEGER PRIMARY KEY",
-			"run INTEGER REFERENCES run(id)",
+			"run INTEGER REFERENCES run(id) ON DELETE CASCADE",
 			"name TEXT NOT NULL",
 			"struct INTEGER NOT NULL REFERENCES struct(id) ON DELETE CASCADE",
 			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL",
@@ -51,7 +51,7 @@ bool SQLConn::createDB()
 		}},
 		{ "use", {
 			"id INTEGER PRIMARY KEY",
-			"run INTEGER REFERENCES run(id)",
+			"run INTEGER REFERENCES run(id) ON DELETE CASCADE",
 			"member INTEGER NOT NULL REFERENCES member(id) ON DELETE CASCADE",
 			"src INTEGER NOT NULL REFERENCES source(id) ON DELETE CASCADE",
 			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL",
