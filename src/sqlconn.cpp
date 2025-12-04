@@ -5,6 +5,8 @@
 
 #include "sqlconn.h"
 
+using namespace ClangStruct;
+
 bool SQLConn::createDB()
 {
 	static const Tables tables {

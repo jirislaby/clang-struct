@@ -16,6 +16,8 @@
 #include "server.h"
 #include "sqlconn.h"
 
+using namespace ClangStruct;
+
 using Clr = SlHelpers::Color;
 
 namespace {

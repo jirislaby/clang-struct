@@ -6,6 +6,8 @@
 
 #include "server.h"
 
+using namespace ClangStruct;
+
 const char Server::queue_name[] = "/db_filler";
 
 Server::~Server()

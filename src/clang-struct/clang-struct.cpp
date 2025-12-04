@@ -22,6 +22,7 @@
 using namespace clang;
 using namespace clang::ast_matchers;
 using namespace clang::ento;
+using namespace ClangStruct;
 using Msg = Message<std::string>;
 
 class Connection {

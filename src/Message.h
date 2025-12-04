@@ -11,6 +11,8 @@
 #include <tuple>
 #include <vector>
 
+namespace ClangStruct {
+
 template<typename T>
 class Message {
 public:
@@ -140,4 +142,6 @@ template<typename T> inline std::ostream& operator<<(std::ostream &os, const Mes
 	}
 
 	return os;
+}
+
 }

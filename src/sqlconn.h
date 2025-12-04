@@ -7,6 +7,8 @@
 
 #include "Message.h"
 
+namespace ClangStruct {
+
 class SQLConn : public SlSqlite::SQLConn {
 public:
 	SQLConn() {}
@@ -29,3 +31,5 @@ private:
 	SlSqlite::SQLStmtHolder insMem;
 	SlSqlite::SQLStmtHolder insUse;
 };
+
+}

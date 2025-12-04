@@ -9,6 +9,8 @@
 
 #include <mqueue.h>
 
+namespace ClangStruct {
+
 class Server {
 public:
 	Server() {}
@@ -32,3 +34,5 @@ private:
 
 	static const char queue_name[];
 };
+
+}
