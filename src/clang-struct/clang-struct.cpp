@@ -195,13 +195,17 @@ void MatchCallback::bindLoc(Msg &msg, const SourceRange &SR)
 std::string MatchCallback::getSrc(const SourceLocation &SLOC)
 {
 	auto src = SM.getPresumedLoc(SLOC).getFilename();
+	std::filesystem::path p(src);
 
-	auto ret = std::filesystem::canonical(src);
+	p = p.lexically_normal();
 
-	if (!basePath.empty())
-		ret = std::filesystem::relative(ret, basePath);
+	if (!basePath.empty()) {
+		auto rel = p.lexically_relative(basePath);
+		if (!rel.empty())
+			p = std::move(rel);
+	}
 
-	return ret.string();
+	return p.string();
 }
 
 void MatchCallback::addRun(Msg &msg)
