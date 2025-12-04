@@ -1,5 +1,6 @@
-#ifndef MESSAGE_H
-#define MESSAGE_H
+// SPDX-License-Identifier: GPL-2.0-only
+
+#pragma once
 
 #include <cassert>
 #include <cstdint>
@@ -140,5 +141,3 @@ template<typename T> inline std::ostream& operator<<(std::ostream &os, const Mes
 
 	return os;
 }
-
-#endif

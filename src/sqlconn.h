@@ -1,5 +1,6 @@
-#ifndef SQLCONN_H
-#define SQLCONN_H
+// SPDX-License-Identifier: GPL-2.0-only
+
+#pragma once
 
 #include <sl/sqlite/SQLiteSmart.h>
 #include <sl/sqlite/SQLConn.h>
@@ -28,5 +29,3 @@ private:
 	SlSqlite::SQLStmtHolder insMem;
 	SlSqlite::SQLStmtHolder insUse;
 };
-
-#endif // SQLCONN_H

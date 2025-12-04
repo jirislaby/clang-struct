@@ -1,5 +1,6 @@
-#ifndef SERVER_H
-#define SERVER_H
+// SPDX-License-Identifier: GPL-2.0-only
+
+#pragma once
 
 #include <csignal>
 #include <optional>
@@ -31,5 +32,3 @@ private:
 
 	static const char queue_name[];
 };
-
-#endif // SERVER_H
