@@ -365,10 +365,35 @@ void MyChecker::checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
 	}
 
 	auto dbFile = A.getAnalyzerOptions().getCheckerStringOption(this, "dbFile");
-	// sqlite is very bad at concurrency
-	Lock l;
-	if (!db.move(dbFile.str(), runId))
-		llvm::errs() << "cannot push the data to the db: " << db.lastError() << '\n';
+	auto &SM = A.getSourceManager();
+	auto FE = SM.getFileEntryRefForID(SM.getMainFileID());
+	auto srcRef = FE->getName();
+	auto srcPath = std::filesystem::canonical(srcRef.str());
+	if (!basePath.empty())
+		srcPath = std::filesystem::relative(srcPath, basePath);
+	auto src = srcPath.string();
+
+	using Clock = std::chrono::steady_clock;
+	using DurDoubleMilli = std::chrono::duration<double, std::milli>;
+
+	auto start = Clock::now();
+	Clock::duration timeLock;
+
+	{
+		// sqlite is very bad at concurrency
+		Lock l;
+		timeLock = Clock::now() - start;
+		start = Clock::now();
+		if (!db.move(dbFile.str(), runId))
+			llvm::errs() << "cannot push the data to the db: " << db.lastError() << '\n';
+	}
+	auto timeDb = Clock::now() - start;
+
+	std::ostringstream ss;
+	ss << "TIME " << src << std::fixed << std::setprecision(3) <<
+	      " LOCK=" << std::chrono::duration_cast<DurDoubleMilli>(timeLock).count() <<
+	      " ms DB=" << std::chrono::duration_cast<DurDoubleMilli>(timeDb).count() << " ms\n";
+	llvm::errs() << ss.str();
 }
 
 extern "C" void clang_registerCheckers(CheckerRegistry &registry) {
