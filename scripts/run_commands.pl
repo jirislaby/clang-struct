@@ -16,6 +16,7 @@ my $basepath = "";
 my $clean;
 my $dbfile = 'structs.db';
 my $filter;
+my $jobs;
 my $run_id;
 my $silent = 0;
 my $skip = 0;
@@ -23,6 +24,7 @@ my $verbose = 0;
 GetOptions(
 	"basepath=s"	=> \$basepath,
 	"clean"		=> \$clean,
+	"jobs=i"	=> \$jobs,
 	"filter=s"	=> \$filter,
 	"run=i"		=> \$run_id,
 	"silent+"	=> \$silent,
@@ -130,7 +132,7 @@ sub time_m_s($) {
 	return int($t / 60) . "m" . $t % 60 . "s";
 }
 
-my $pm = Parallel::ForkManager->new(getNumCpu());
+my $pm = Parallel::ForkManager->new($jobs // getNumCpu());
 $pm->set_waitpid_blocking_sleep(0);
 my $stop = 0;
 
