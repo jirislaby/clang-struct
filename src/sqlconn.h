@@ -65,7 +65,7 @@ public:
 	SQLConn() {}
 
 	bool open() noexcept {
-#define USE_TEMPORARY 1
+#define USE_TEMPORARY 0
 #if USE_TEMPORARY
 		static const std::filesystem::path tempDBName("");
 #else
