@@ -160,11 +160,6 @@ bool SQLConnReal::createDB()
 	};
 
 	static const Triggers triggers {
-		{ "TRIG_use_A_INS AFTER INSERT ON use", "UPDATE member SET uses = uses+1, "
-			"loads = loads + (NEW.load IS 1), "
-			"stores = stores + (NEW.load IS 0), "
-			"implicit_uses = implicit_uses + (NEW.implicit == 1) "
-			"WHERE id = NEW.member" },
 	};
 
 	static const Views views {
