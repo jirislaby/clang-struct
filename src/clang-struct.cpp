@@ -390,7 +390,7 @@ void MyChecker::checkEndOfTranslationUnit(const TranslationUnitDecl *TU,
 	auto timeDb = Clock::now() - start;
 
 	std::ostringstream ss;
-	ss << "TIME " << src << std::fixed << std::setprecision(3) <<
+	ss << "TIME " << getpid() << " " << src << std::fixed << std::setprecision(3) <<
 	      " LOCK=" << std::chrono::duration_cast<DurDoubleMilli>(timeLock).count() <<
 	      " ms DB=" << std::chrono::duration_cast<DurDoubleMilli>(timeDb).count() << " ms\n";
 	llvm::errs() << ss.str();
