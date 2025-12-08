@@ -10,22 +10,12 @@ using namespace ClangStruct;
 bool SQLConn::createDB()
 {
 	static const Tables tables {
-		{ "run", {
-			"id INTEGER PRIMARY KEY",
-			"version TEXT",
-			"sha TEXT",
-			"filter TEXT",
-			"skip INTEGER NOT NULL CHECK(skip IN (0, 1))",
-			"timestamp TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW', 'localtime'))",
-		}},
 		{ "source", {
 			"id INTEGER PRIMARY KEY",
-			"run INTEGER REFERENCES run(id) ON DELETE CASCADE",
 			"src TEXT NOT NULL UNIQUE",
 		}},
 		{ "struct", {
 			"id INTEGER PRIMARY KEY",
-			"run INTEGER REFERENCES run(id) ON DELETE CASCADE",
 			"parent INTEGER REFERENCES struct(id) ON DELETE CASCADE",
 			"type TEXT NOT NULL CHECK(type IN ('s', 'u'))",
 			"name TEXT NOT NULL",
@@ -39,7 +29,6 @@ bool SQLConn::createDB()
 		}},
 		{ "member", {
 			"id INTEGER PRIMARY KEY",
-			"run INTEGER REFERENCES run(id) ON DELETE CASCADE",
 			"name TEXT NOT NULL",
 			"struct INTEGER NOT NULL REFERENCES struct(id) ON DELETE CASCADE",
 			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL",
@@ -55,7 +44,6 @@ bool SQLConn::createDB()
 		}},
 		{ "use", {
 			"id INTEGER PRIMARY KEY",
-			"run INTEGER REFERENCES run(id) ON DELETE CASCADE",
 			"member INTEGER NOT NULL REFERENCES member(id) ON DELETE CASCADE",
 			"src INTEGER NOT NULL REFERENCES source(id) ON DELETE CASCADE",
 			"begLine INTEGER NOT NULL, begCol INTEGER NOT NULL",
@@ -77,14 +65,14 @@ bool SQLConn::createDB()
 
 	static const Views views {
 		{ "struct_view",
-			"SELECT struct.id, struct.run AS run, type, "
-				"struct.name AS struct, attrs, packed, inMacro, source.src, "
+			"SELECT struct.id, type, struct.name AS struct, attrs, packed, inMacro, "
+				"source.src, "
 				"struct.begLine || ':' || struct.begCol || '-' || "
 				"struct.endLine || ':' || struct.endCol AS location "
 			"FROM struct LEFT JOIN source ON struct.src=source.id"
 		},
 		{ "member_view",
-			"SELECT member.id, member.run AS run, struct.name AS struct, struct.attrs, "
+			"SELECT member.id, struct.name AS struct, struct.attrs, "
 				"member.name AS member, source.src, "
 				"member.begLine || ':' || member.begCol || '-' || "
 				"member.endLine || ':' || member.endCol AS location, "
@@ -94,7 +82,7 @@ bool SQLConn::createDB()
 			"LEFT JOIN source ON struct.src=source.id"
 		},
 		{ "use_view",
-			"SELECT use.id, use.run AS run, struct.name AS struct, struct.attrs, "
+			"SELECT use.id, struct.name AS struct, struct.attrs, "
 				"member.name AS member, source.src, "
 				"use.begLine || ':' || use.begCol || '-' || "
 				"use.endLine || ':' || use.endCol AS location, load, implicit "
@@ -104,7 +92,7 @@ bool SQLConn::createDB()
 			"LEFT JOIN source ON use.src=source.id"
 		},
 		{ "unused_view",
-			"SELECT member.run AS run, struct.name AS struct, struct.attrs, "
+			"SELECT struct.name AS struct, struct.attrs, "
 				"member.name AS member, source.src, "
 				"member.begLine || ':' || member.begCol || '-' || "
 				"member.endLine || ':' || member.endCol AS location "
@@ -123,15 +111,15 @@ bool SQLConn::createDB()
 bool SQLConn::prepDB()
 {
 	const Statements stmts {
-		{ insSrc, "INSERT INTO source(run, src) VALUES (:run, :src);" },
+		{ insSrc, "INSERT INTO source(src) VALUES (:src);" },
 		{ insStr, "INSERT INTO "
-				"struct(run, type, name, attrs, packed, inMacro, src, begLine, begCol, endLine, endCol) "
-				"VALUES (:run, :type, :name, :attrs, :packed, :inMacro, "
+				"struct(type, name, attrs, packed, inMacro, src, begLine, begCol, endLine, endCol) "
+				"VALUES (:type, :name, :attrs, :packed, :inMacro, "
 				"(SELECT id FROM source WHERE src=:src), "
 				":begLine, :begCol, :endLine, :endCol);" },
 		{ insMem, "INSERT INTO "
-				"member(run, name, struct, begLine, begCol, endLine, endCol) "
-				"VALUES (:run, :name, "
+				"member(name, struct, begLine, begCol, endLine, endCol) "
+				"VALUES (:name, "
 				"(SELECT id "
 				  "FROM struct "
 				  "WHERE src = (SELECT id FROM source WHERE src = :src) AND "
@@ -139,8 +127,8 @@ bool SQLConn::prepDB()
 				  "name = :struct), "
 				":begLine, :begCol, :endLine, :endCol);" },
 		{ insUse, "INSERT INTO "
-				"use(run, member, src, begLine, begCol, endLine, endCol, load, implicit) "
-				"VALUES (:run, "
+				"use(member, src, begLine, begCol, endLine, endCol, load, implicit) "
+				"VALUES ("
 				  "(SELECT id FROM member "
 				    "WHERE name = :member AND "
 				    "struct = (SELECT id FROM struct "
