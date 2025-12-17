@@ -53,14 +53,13 @@ CREATE TABLE IF NOT EXISTS run(
 EOF
 ) || die "cannot CREATE TABLE run";
 
-my $config = "";
-open(my $config_f, "<.config") or die "cannot read .config";
-while (<$config_f>) {
-	next if /^#/;
-	next if /^$/;
-	$config .= $_;
+my $config;
+{
+	local $/ = undef;
+	open(my $config_f, "<.config") or die "cannot read .config";
+	$config = <$config_f>;
+	close $config_f;
 }
-close $config_f;
 
 my $config_sha = sha1_hex($config);
 my $ins = $dbh->prepare('INSERT INTO config(sha, config) VALUES (?, ?)') || die "cannot prepare";
