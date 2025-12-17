@@ -1,5 +1,7 @@
 class MembersController < ApplicationController
   def index
+    @run_version = Run.last.version
+
     @title = 'Members'
     order_dir = ''
     if params[:order_dir] == 'desc'
@@ -45,7 +47,7 @@ class MembersController < ApplicationController
     unless params[:filter_file].blank?
       @members = @members.where("source.src LIKE ? ESCAPE '\\'", params[:filter_file])
     end
-    @members = @members.left_joins({:struct => :source}).left_joins(:run)
+    @members = @members.left_joins({:struct => :source})
     if params[:nopacked] == '1'
       @members = @members.merge(MyStruct.nopacked)
     end
@@ -75,7 +77,6 @@ class MembersController < ApplicationController
     end
 
     @members = @members.select('member.*', 'member.struct AS struct_id',
-                               'run.version',
                                'struct.type AS struct_type',
                                'struct.name AS struct_name',
                                'struct.begLine AS struct_begLine',

@@ -1,5 +1,7 @@
 class StructsController < ApplicationController
   def index
+    @run_version = Run.last.version
+
     @title = 'Structures'
     order_dir = ''
     if params[:order_dir] == 'desc'
@@ -27,7 +29,6 @@ class StructsController < ApplicationController
       @structs = @structs.where("source.src LIKE ? ESCAPE '\\'", params[:filter_file])
     end
     @structs = @structs.left_joins(:source)
-    @structs = @structs.left_joins(:run)
     @structs_all_count = @structs.count # ALL COUNT
 
     @page = @offset = 0
@@ -44,7 +45,7 @@ class StructsController < ApplicationController
     else
       @next_page = 0
     end
-    @structs = @structs.select('struct.*', 'source.src AS src_file', 'run.version').
+    @structs = @structs.select('struct.*', 'source.src AS src_file').
       order(order).limit(listing_limit)
 
     respond_to do |format|
@@ -53,6 +54,8 @@ class StructsController < ApplicationController
   end
 
   def show
+    @run_version = Run.last.version
+
     @struct = MyStruct.left_joins(:source).select('struct.*', 'source.src AS src_file').find(params[:id])
     @title = @struct.name + (@struct.type == 's' ? ' (struct)' : ' (union)')
     base = Member.left_joins(:struct).select('member.id', 'member.struct', 'struct.src', 'member.begLine', 'member.begCol', '0').where(:struct => params[:id])
@@ -62,7 +65,7 @@ class StructsController < ApplicationController
         #{base.to_sql}
         UNION
         SELECT member.id, member.struct, struct.src, member.begLine, member.begCol, level + 1 FROM nested INNER JOIN struct ON struct.id != nested.struct AND struct.src = nested.src AND struct.begLine = nested.begLine AND struct.begCol = nested.begCol LEFT JOIN member ON struct.id = member.struct WHERE level < 10)
-      SELECT level, run.version, member.*, member.struct AS struct_id FROM nested NATURAL JOIN member LEFT JOIN run ON member.run = run.id ORDER BY begLine, begCol;
+      SELECT level, member.*, member.struct AS struct_id FROM nested NATURAL JOIN member ORDER BY begLine, begCol;
 SQL
     )
 
