@@ -145,7 +145,7 @@ template <typename T>
 int SQLConn::bindAndStep(SlSqlite::SQLStmtHolder &ins, const Message<T> &msg)
 {
 	using Msg = Message<T>;
-	SlSqlite::SQLStmtResetter insSrcResetter(sqlHolder, ins);
+	SlSqlite::SQLStmtResetter insSrcResetter(ins);
 
 	for (auto e: msg) {
 		const auto [type, key, val] = e;
