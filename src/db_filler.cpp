@@ -109,6 +109,7 @@ int main(int argc, char **argv)
 		if (!sqlConn.end())
 			return EXIT_FAILURE;
 	}
+	sqlConn.exec("VACUUM;");
 	std::cerr << "bye\n";
 
 	return 0;
