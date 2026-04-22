@@ -16,7 +16,7 @@ test -f "$DB"
 trap "rm -f '$DB'" EXIT
 
 SQL=`sed -n 's@.*SQL: @@ p' "$FILE"`
-SQLITE=(sqlite3 -batch -noheader -csv "$DB")
+SQLITE=(sqlite3 -batch -noheader -list "$DB")
 EXPECT=`sed -n 's@.*EXPECT: @@ p' "$FILE"`
 
 if ! "${SQLITE[@]}" "$SQL" | grep -q "$EXPECT"; then
