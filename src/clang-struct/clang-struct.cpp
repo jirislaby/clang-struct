@@ -223,6 +223,7 @@ void MatchCallback::addSrc(Msg &msg, const std::string &src)
 void MatchCallback::handleUse(const SourceRange &initSR, const NamedDecl *ND, const RecordDecl *RD,
 			      int load, bool implicit)
 {
+	RD = RD->getDefinition();
 	auto strLoc = RD->getBeginLoc();
 	auto strSrc = getSrc(strLoc);
 	auto useSrc = getSrc(initSR.getBegin());
