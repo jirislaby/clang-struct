@@ -18,7 +18,12 @@
           <div id="menu">
             <span><%= link_to('Structures/Unions List', structs_path()) %></span>
             <span><%= link_to('Members List', members_path()) %></span>
-            <span><%= link_to('Potentially Unused Members List', members_path(unused: 1)) %></span>
+            <span><%= link_to('Potentially Unused Members List',
+                              members_path(unused: 1,
+                                           nopacked: 1,
+                                           nomacro: 1,
+                                           noreserved: 1,
+                                           noimplicit: 1)) %></span>
           </div>
         </div>
       </div>
