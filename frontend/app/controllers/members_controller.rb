@@ -38,10 +38,11 @@ class MembersController < ApplicationController
                                 'member.name NOT LIKE ? AND ' +
                                 'member.name NOT LIKE ? AND ' +
                                 'member.name NOT LIKE ? AND ' +
+                                'member.name NOT LIKE ? AND ' +
+                                'member.name NOT LIKE ? AND ' +
                                 'struct.name NOT LIKE ? AND ' +
                                 'struct.name NOT LIKE ?',
-                                '%dummy%', '%pad%', '%reserve%',
-                                '%unused%',
+                                '%dummy%', '%pad%', '%reserve%', '%resv%', '%rsvd%', '%unused%',
                                 'compat_%', 'trace_event_raw_%')
     end
     unless params[:filter_file].blank?
