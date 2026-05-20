@@ -4,9 +4,13 @@
 #include <cstring>
 #include <iostream>
 
+#include <sl/helpers/Exception.h>
+
 #include "server.h"
 
 using namespace ClangStruct;
+using RunEx = SlHelpers::RuntimeException;
+const auto &RERaise = SlHelpers::raise;
 
 const constexpr std::string_view Server::queue_name { "/db_filler" };
 
@@ -47,22 +51,16 @@ void Server::unlink()
 	::mq_unlink(queue_name.data());
 }
 
-int Server::open()
+void Server::open()
 {
 	mq = ::mq_open(queue_name.data(), O_CREAT | O_EXCL | O_RDONLY, 0600,
 		     nullptr);
-	if (mq < 0) {
-		std::cerr << "cannot open msg queue: " << strerror(errno) << "\n";
-		return -1;
-	}
+	if (mq < 0)
+		RunEx("cannot open msg queue: ") << strerror(errno) << RERaise;
 
 	mq_attr attr;
-	if (::mq_getattr(mq, &attr) < 0) {
-		std::cerr << "cannot get msg attr: " << strerror(errno) << "\n";
-		return -1;
-	}
+	if (::mq_getattr(mq, &attr) < 0)
+		RunEx("cannot get msg attr: ") << strerror(errno) << RERaise;
 
 	buf.resize(attr.mq_msgsize);
-
-	return 0;
 }

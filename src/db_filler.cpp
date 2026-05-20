@@ -66,8 +66,7 @@ void handledMain(int argc, char **argv)
 		RunEx("").raise();
 	}
 
-	if (server.open() < 0)
-		RunEx("server open failed").raise();
+	server.open();
 
 	if (!sqlConn.open())
 		RunEx(sqlConn.lastError()).raise();

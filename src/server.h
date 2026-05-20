@@ -16,7 +16,7 @@ public:
 	Server() {}
 	~Server();
 
-	int open();
+	void open();
 	void close();
 
 	static void unlink();
