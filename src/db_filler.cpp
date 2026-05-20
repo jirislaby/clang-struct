@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 
 #include <sl/helpers/Color.h>
+#include <sl/helpers/Exception.h>
 
 #include "server.h"
 #include "sqlconn.h"
@@ -19,6 +20,7 @@
 using namespace ClangStruct;
 
 using Clr = SlHelpers::Color;
+using RunEx = SlHelpers::RuntimeException;
 
 namespace {
 
@@ -35,9 +37,7 @@ void sig(int sig)
 		_exit(EXIT_FAILURE);
 }
 
-} // namespace
-
-int main(int argc, char **argv)
+void handledMain(int argc, char **argv)
 {
 	signal(SIGABRT, sig);
 	signal(SIGINT, sig);
@@ -56,27 +56,24 @@ int main(int argc, char **argv)
 		const auto opts = options.parse(argc, argv);
 		if (opts.contains("help")) {
 			std::cout << options.help();
-			return 0;
+			return;
 		}
 		if (opts.contains("unlink"))
 			server.unlink();
 	} catch (const cxxopts::exceptions::parsing &e) {
 		Clr(std::cerr, Clr::RED) << "arguments error: " << e.what();
 		std::cerr << options.help();
-		return EXIT_FAILURE;
+		RunEx("").raise();
 	}
 
 	if (server.open() < 0)
-		return EXIT_FAILURE;
+		RunEx("server open failed").raise();
 
-	if (!sqlConn.open()) {
-		Clr(std::cerr, Clr::RED) << sqlConn.lastError();
-		return EXIT_FAILURE;
-	}
-	if (!autocommit && !sqlConn.begin()) {
-		Clr(std::cerr, Clr::RED) << sqlConn.lastError();
-		return EXIT_FAILURE;
-	}
+	if (!sqlConn.open())
+		RunEx(sqlConn.lastError()).raise();
+
+	if (!autocommit && !sqlConn.begin())
+		RunEx(sqlConn.lastError()).raise();
 
 	Message<std::string_view> msg;
 	bool should_commit = false;
@@ -90,7 +87,7 @@ int main(int argc, char **argv)
 			if (should_commit) {
 				std::cerr << "commiting\n";
 				if (!sqlConn.end() || !sqlConn.begin())
-					return EXIT_FAILURE;
+					RunEx("SQL commit failed").raise();
 				should_commit = false;
 			}
 			continue;
@@ -107,10 +104,21 @@ int main(int argc, char **argv)
 	if (!autocommit) {
 		std::cerr << "commiting\n";
 		if (!sqlConn.end())
-			return EXIT_FAILURE;
+			RunEx("SQL commit failed").raise();
 	}
 	sqlConn.exec("VACUUM;");
 	std::cerr << "bye\n";
+}
 
-	return 0;
+} // namespace
+
+int main(int argc, char **argv)
+{
+	try {
+		handledMain(argc, argv);
+		return 0;
+	} catch (const std::runtime_error &e) {
+		Clr(std::cerr, Clr::RED) << e.what();
+		return EXIT_FAILURE;
+	}
 }
