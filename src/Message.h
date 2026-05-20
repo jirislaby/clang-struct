@@ -32,7 +32,7 @@ public:
 	using storage = std::vector<entry>;
 
 	Message() : Message(KIND::INVALID) { }
-	Message(const KIND &kind) : kind(kind) { entries.reserve(10); }
+	Message(KIND kind) : kind(kind) { entries.reserve(10); }
 
 	void add(TYPE type, T key, T val) {
 		entries.emplace_back(std::move(type), std::move(key), std::move(val));
@@ -51,7 +51,7 @@ public:
 		add(INT, std::move(key), std::to_string(val));
 	}
 
-	void renew(const KIND &kind) {
+	void renew(KIND kind) {
 		entries.clear();
 		setKind(kind);
 	}
@@ -68,7 +68,7 @@ public:
 	void deserialize(const std::string_view &str);
 private:
 
-	void setKind(const KIND &kind) { this->kind = kind; }
+	void setKind(KIND kind) { this->kind = kind; }
 
 	static void serializeString(std::stringstream &ss, const std::string &str);
 	static std::string_view deserializeString(std::string_view &str);
