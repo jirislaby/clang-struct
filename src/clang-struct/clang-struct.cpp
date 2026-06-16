@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <set>
 
+#include "clang/AST/TypeBase.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
 #include "clang/StaticAnalyzer/Core/Checker.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/AnalysisManager.h"
@@ -419,7 +420,8 @@ void MatchCallback::handleILE(const InitListExpr *ILE, ASTContext *AC)
 		}
 	} else if (T->isUnionType()) {
 	} else if (!T->isConstantArrayType() && !llvm::isa<TypeOfType>(T) &&
-		   !llvm::isa<BuiltinType>(T) && !llvm::isa<PointerType>(T)) {
+		   !llvm::isa<BuiltinType>(T) && !llvm::isa<PointerType>(T) &&
+		   !llvm::isa<EnumType>(T)) {
 		llvm::errs() << __PRETTY_FUNCTION__ << ": unhandled type\n";
 		ILE->getSourceRange().dump(SM);
 		ILE->dumpColor();
