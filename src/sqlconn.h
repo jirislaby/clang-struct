@@ -14,7 +14,7 @@ public:
 	SQLConn() {}
 
 	bool open(const std::filesystem::path &dbFile = "structs.db") noexcept {
-		return SlSqlite::SQLConn::open(dbFile, SlSqlite::CREATE);
+		return SlSqlite::SQLConn::open(dbFile, SlSqlite::OpenFlags::CREATE);
 	}
 
 	template <typename T>
